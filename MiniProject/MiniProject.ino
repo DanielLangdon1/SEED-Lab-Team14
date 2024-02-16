@@ -25,8 +25,8 @@ int initialEncoderCount[2] = {0,0}; //Found in setup to check for change in coun
 float initialEncoderCountRad[2]; //Radian version of initial count
 float vel[2]; //Velocity found from timeelapsed and count/radian change
 float desiredVel[2]; //Desired velocity to achieve in radian/second
-float Kp; //Controller gain for proportional 
-float Ki; //Controller gain for integrator
+float Kp = 21.3755161809698; //Controller gain for proportional 
+float Ki = 7.27394290572116; //Controller gain for integrator
 float voltage = 0; // voltage to be used for speed and position control
 float batteryVoltage = 7.8; //Sets saturation point for battery
 //Defines error values for position and integral
@@ -116,6 +116,10 @@ void setup() {
 
 void loop() {
   // put your main code here, to run repeatedly:
+
+if (){}
+
+  
 if (currentEncoderCount[0] != desiredEncoderCount{
     if(currentEncoderCount[0]> desiredEncoderCount){
       digitalWrite(MotorSign[0],LOW);}

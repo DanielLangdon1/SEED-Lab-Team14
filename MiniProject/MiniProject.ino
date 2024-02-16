@@ -11,8 +11,7 @@ const int MotorEnable = 4;
 unsigned long desired_Ts_ms = 10;
 unsigned long last_time_ms;
 
-float lastEncoderTime1; //Initializes time variable for use in ISR
-float lastEncoderTime2; //Initializes time variable for use in ISR
+float lastEncoderTime[2]; //Initializes time variable for use in ISR
 float startTime; //Set up in Setup function to calculate current time in loop
 float initialTime; //Used to calculate time elapsed for velocity
 float lastTime; //Used to compute current time
@@ -49,7 +48,7 @@ void myISR1() {
       count1--;
       count1--;
     }
-    lastEncoderTime1 = micros();
+    lastEncoderTime[0] = micros();
   }
 }
 
@@ -63,7 +62,7 @@ void myISR2() {
       count2--;
       count2--;
     }
-    lastEncoderTime2 = micros();
+    lastEncoderTime[1] = micros();
   }
 }
 
@@ -103,14 +102,15 @@ void setup() {
   digitalWrite(MotorEnable,HIGH);
 
   initialEncoderCount[0] = MyEnc1();
-  initialEncoderCount[0] = MyEnc
+  initialEncoderCount[1] = MyEnc2();
   for (int i = 0; i < 2; i++){
-    
+    initialEncoderCountRad[i] = 2*PI*(float)(initialEncoderCount[i])/3200;
+    lastEncoderTime[i] = micros();
   }
-    
 
-  
-  
+  startTime = millis();
+  initialTime = millis();
+  Serial.begin(9600);
 
 }
 

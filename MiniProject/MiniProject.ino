@@ -119,5 +119,3 @@ void loop() {
 
 }
 
-Hello my name is Daniel 
-wassup

@@ -116,6 +116,19 @@ void setup() {
 
 void loop() {
   // put your main code here, to run repeatedly:
-
+if (currentEncoderCount[0] != desiredEncoderCount{
+    if(currentEncoderCount[0]> desiredEncoderCount){
+      digitalWrite(MotorSign[0],LOW);}
+    if(currentEncoderCount[0]< desiredEncoderCount){
+        digitalWrite(MotorSign[0],HIGH);
+    }
+  }
+ if (currentEncoderCount[1] != desiredEncoderCount{
+    if(currentEncoderCount[1]> desiredEncoderCount){
+      digitalWrite(MotorSign[1],LOW);}
+    if(currentEncoderCount[1]< desiredEncoderCount){
+        digitalWrite(MotorSign[1],HIGH);
+    }
+  }
 }
 

@@ -132,3 +132,36 @@ if (currentEncoderCount[0] != desiredEncoderCount{
   }
 }
 
+// printReceived helps us see what data we are getting from the leader
+void printReceived() {
+
+  Serial.print("Message: ");
+  for (int i=0;i<msgLength;i++) {
+    Serial.print(String((char) instruction[i]));
+  }
+  Serial.println(""); 
+
+  wheel_1 =  instruction[0] - 48;
+  wheel_2 = instruction[1] - 48;
+
+  Serial.print("Wheel 1: ");
+  Serial.print(wheel_1);
+  Serial.println("");
+
+  Serial.print("Wheel 2: ");
+  Serial.print(wheel_2);
+  Serial.println("");
+
+}
+// function called when an I2C interrupt event happens
+void receive() {
+  // Set the offset, this will always be the first byte.
+  offset = Wire.read();
+  // If there is information after the offset, it is telling us more about the command.
+  while (Wire.available()) {
+    instruction[msgLength] = Wire.read();
+    msgLength++;
+    
+  }
+}
+

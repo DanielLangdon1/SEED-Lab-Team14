@@ -1,4 +1,14 @@
+#include <Wire.h>
+#define MY_ADDR 8
 #define PI 3.14159265358979323 // Defines irrational number PI for mathematical use later
+
+// Global variables to be used for I2C communication
+volatile uint8_t offset = 0;
+volatile uint8_t instruction[32] = {0};
+volatile uint8_t msgLength = 0;
+int wheel_1=0;
+int wheel_2=0;
+
 
 // These lines define the pins each motor and encoder pins go to 
 const int MotorVoltage[2] = {9,10}; 
@@ -16,6 +26,7 @@ float startTime; //Set up in Setup function to calculate current time in loop
 float initialTime; //Used to calculate time elapsed for velocity
 float lastTime; //Used to compute current time
 float currentTime; //Initializes current time for loop
+float timeElapsed;
 
 int count1; //Initializes encoder counts for the ISR
 int count2; //Initializes encoder counts for the second encoder ISR
@@ -25,9 +36,10 @@ int initialEncoderCount[2] = {0,0}; //Found in setup to check for change in coun
 float initialEncoderCountRad[2]; //Radian version of initial count
 float vel[2]; //Velocity found from timeelapsed and count/radian change
 float desiredVel[2]; //Desired velocity to achieve in radian/second
-float Kp = 21.3755161809698; //Controller gain for proportional 
-float Ki = 7.27394290572116; //Controller gain for integrator
-float voltage = 0; // voltage to be used for speed and position control
+float Kp_pos = 21.3755161809698; //Controller gain for proportional 
+float Ki_pos = 7.27394290572116; //Controller gain for integrator
+float Kp = 3.3;
+float voltage[2] = {0,0}; // voltage to be used for speed and position control
 float batteryVoltage = 7.8; //Sets saturation point for battery
 //Defines error values for position and integral
 float pos_error[2]; 
@@ -36,14 +48,11 @@ float actualPos[2];
 float integralError[2];
 float error[2];
 
-unsigned int PWM; //PWM variable to be used for later
-
-int wheel_1;
-int wheel_2;
+int PWM[2] = {0,0}; //PWM variable to be used for later
 
 //ISR to check for a change in state of the encoder
 void myISR1() {
-  if(micros() - lastEncoderTime > 100) {
+  if(micros() - lastEncoderTime[0] > 100) {
     if(digitalRead(encoderInterrupts[0]) == digitalRead(encoderPins[0])) {
       count1++;
       count1++;
@@ -57,7 +66,7 @@ void myISR1() {
 
 //ISR to check for a change in state of the encoder
 void myISR2() {
-  if(micros() - lastEncoderTime > 100) {
+  if(micros() - lastEncoderTime[0] > 100) {
     if(digitalRead(encoderInterrupts[0]) == digitalRead(encoderPins[0])) {
       count2++;
       count2++;
@@ -71,7 +80,7 @@ void myISR2() {
 
 //Function to return encoder counts
 int MyEnc1() {
-  if(digitalRead(encoderInterrupts[0]) != digitalRead(encoderPins[0])) {
+  if(digitalRead(encoderInterrupts[1]) != digitalRead(encoderPins[0])) {
     return(count1+1);
   } else{
     return(count1);
@@ -111,47 +120,102 @@ void setup() {
     lastEncoderTime[i] = micros();
   }
 
+  Serial.begin(115200);
+  // We want to control the built-in LED (pin 13)
+  pinMode(LED_BUILTIN, OUTPUT);
+  // Initialize I2C
+  Wire.begin(MY_ADDR);
+  // Set callbacks for I2C interrupts
+  Wire.onReceive(receive);
+
   startTime = millis();
   initialTime = millis();
-  Serial.begin(9600);
 
 }
 
 void loop() {
-//////////////////////////////////////////////////////"pseudocode" for wheel logic ////// need to fix variable names
-  /// desired encoder counts uninitialized. use rads or counts?
-  if (wheel_1 == 1){
-    desiredEncoderCount1 = 1600;
-  }
-  if(wheel_2 == 1){
-    desiredEncoderCount2 = 1600
-  }
-  else if(wheel_1 == 0) {
-    desiredEncoderCount1 = 0;
-  }
-  else if(wheel_2 == 0) {
-    desiredEncoderCount2 = 0;
-    
-  }
-    
-  
-    
-  if (currentEncoderCount[0] != desiredEncoderCount{
-      if(currentEncoderCount[0]> desiredEncoderCount){
-        digitalWrite(MotorSign[0],LOW);}
-      if(currentEncoderCount[0]< desiredEncoderCount){
-          digitalWrite(MotorSign[0],HIGH);
-      }
-    }
-   if (currentEncoderCount[1] != desiredEncoderCount{
-      if(currentEncoderCount[1]> desiredEncoderCount){
-        digitalWrite(MotorSign[1],LOW);}
-      if(currentEncoderCount[1]< desiredEncoderCount){
-          digitalWrite(MotorSign[1],HIGH);
-      }
-    }
+  // put your main code here, to run repeatedly:
+  lastTime = millis();
+  //Compute current time
+  currentTime = (float)((lastTime-startTime)/1000);
+  // If there is data on the buffer, read it
+  if (msgLength > 0) {
+    printReceived();
+    msgLength = 0;
   }
 
+  timeElapsed = (float)(millis()-initialTime)/1000;
+  currentEncoderCount[0] = MyEnc1();
+  currentEncoderCountRad[0] = 2*PI*(float)(currentEncoderCount[0])/3200;
+  timeElapsed = (float)(millis()-initialTime)/1000;
+  vel[0] = (currentEncoderCountRad[0]-initialEncoderCountRad[0])/timeElapsed;
+
+
+  currentEncoderCount[1] = MyEnc2();
+  currentEncoderCountRad[1] = 2*PI*(float)(currentEncoderCount[1])/3200;
+  vel[1] = (currentEncoderCountRad[1]-initialEncoderCountRad[1])/timeElapsed;
+
+  initialEncoderCount[0] = currentEncoderCount[0];
+  initialEncoderCountRad[0] = currentEncoderCountRad[0];
+  initialEncoderCount[1] = currentEncoderCount[1];
+  initialEncoderCountRad[1] = currentEncoderCountRad[1];
+
+
+  initialTime = millis();
+  if (wheel_1 == 1 ) {
+    desiredPos[0] = PI;
+  } else if (wheel_1 == 0) {
+    desiredPos[0] = 0;
+  }
+  if (wheel_2 == 1) {
+    desiredPos[1] = PI;
+  } else if (wheel_2 == 0) {
+    desiredPos[1] = 0;
+  } 
+
+  for (int i = 0; i<2; i++) {
+    pos_error[i] = desiredPos[i] - currentEncoderCountRad[i];
+    if (desiredVel[i] < 10) {
+      integralError[i] = integralError[i] + pos_error[i]*((float)(desired_Ts_ms/1000));
+      desiredVel[i] = Kp_pos*pos_error[i] + Ki_pos * integralError[i];
+    } else {
+      desiredVel[i] = Kp_pos*pos_error[i]; 
+    }
+    error[i] = desiredVel[i] - vel[i];
+    voltage[i] = Kp * error[i];
+
+    if (voltage[i] > 0) {
+      digitalWrite(MotorSign[i],HIGH);
+    } else {
+      digitalWrite(MotorSign[i], LOW);
+    }
+    PWM[i] = 255*abs(voltage[i])/batteryVoltage;
+    analogWrite(MotorVoltage[i],min(PWM,255));
+  }
+
+
+
+ /* 
+if (currentEncoderCount[0] != desiredEncoderCount{
+    if(currentEncoderCount[0]> desiredEncoderCount){
+      digitalWrite(MotorSign[0],LOW);}
+    if(currentEncoderCount[0]< desiredEncoderCount){
+        digitalWrite(MotorSign[0],HIGH);
+    }
+  }
+ if (currentEncoderCount[1] != desiredEncoderCount{
+    if(currentEncoderCount[1]> desiredEncoderCount){
+      digitalWrite(MotorSign[1],LOW);}
+    if(currentEncoderCount[1]< desiredEncoderCount){
+        digitalWrite(MotorSign[1],HIGH);
+    }
+  }*/
+
+  while(millis()<last_time_ms+desired_Ts_ms){
+    //wait till desired time passes
+  }
+  last_time_ms=millis();
+}
 // printReceived helps us see what data we are getting from the leader
 void printReceived() {
 

@@ -190,7 +190,7 @@ void loop() {
       digitalWrite(MotorSign[i], LOW);
     }
     PWM[i] = 255*abs(voltage[i])/batteryVoltage;
-    analogWrite(MotorVoltage[i],min(PWM,255));
+    analogWrite(MotorVoltage[i],min(PWM[i],255));
   }
 
 

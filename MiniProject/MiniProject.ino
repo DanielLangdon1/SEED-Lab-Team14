@@ -38,6 +38,9 @@ float error[2];
 
 unsigned int PWM; //PWM variable to be used for later
 
+int wheel_1;
+int wheel_2;
+
 //ISR to check for a change in state of the encoder
 void myISR1() {
   if(micros() - lastEncoderTime > 100) {
@@ -115,26 +118,36 @@ void setup() {
 }
 
 void loop() {
-  // put your main code here, to run repeatedly:
-
-if (){}
-
+//////////////////////////////////////////////////////"pseudocode" for wheel logic ////// need to fix variable names
+  /// desired encoder counts uninitialized. use rads or counts?
+  if (wheel_1 == 1){
+    desiredEncoderCount1 = 1800;
+  }
+  if(wheel_2 == 1){
+    desiredEncoderCount2 = 1800
+  }
+  else {
+    desiredEncoderCount1 = 0;
+    desiredEncoderCount2 = 0;
+  }
+    
   
-if (currentEncoderCount[0] != desiredEncoderCount{
-    if(currentEncoderCount[0]> desiredEncoderCount){
-      digitalWrite(MotorSign[0],LOW);}
-    if(currentEncoderCount[0]< desiredEncoderCount){
-        digitalWrite(MotorSign[0],HIGH);
+    
+  if (currentEncoderCount[0] != desiredEncoderCount{
+      if(currentEncoderCount[0]> desiredEncoderCount){
+        digitalWrite(MotorSign[0],LOW);}
+      if(currentEncoderCount[0]< desiredEncoderCount){
+          digitalWrite(MotorSign[0],HIGH);
+      }
+    }
+   if (currentEncoderCount[1] != desiredEncoderCount{
+      if(currentEncoderCount[1]> desiredEncoderCount){
+        digitalWrite(MotorSign[1],LOW);}
+      if(currentEncoderCount[1]< desiredEncoderCount){
+          digitalWrite(MotorSign[1],HIGH);
+      }
     }
   }
- if (currentEncoderCount[1] != desiredEncoderCount{
-    if(currentEncoderCount[1]> desiredEncoderCount){
-      digitalWrite(MotorSign[1],LOW);}
-    if(currentEncoderCount[1]< desiredEncoderCount){
-        digitalWrite(MotorSign[1],HIGH);
-    }
-  }
-}
 
 // printReceived helps us see what data we are getting from the leader
 void printReceived() {

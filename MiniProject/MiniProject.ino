@@ -121,14 +121,17 @@ void loop() {
 //////////////////////////////////////////////////////"pseudocode" for wheel logic ////// need to fix variable names
   /// desired encoder counts uninitialized. use rads or counts?
   if (wheel_1 == 1){
-    desiredEncoderCount1 = 1800;
+    desiredEncoderCount1 = 1600;
   }
   if(wheel_2 == 1){
-    desiredEncoderCount2 = 1800
+    desiredEncoderCount2 = 1600
   }
-  else {
+  else if(wheel_1 == 0) {
     desiredEncoderCount1 = 0;
+  }
+  else if(wheel_2 == 0) {
     desiredEncoderCount2 = 0;
+    
   }
     
   

@@ -30,23 +30,23 @@ float timeElapsed;
 
 int count1; //Initializes encoder counts for the ISR
 int count2; //Initializes encoder counts for the second encoder ISR
-int currentEncoderCount[2]; //Intilization for Encoder Counts to be used in loop 
-float currentEncoderCountRad[2]; //Converted counts to radian for velocity in rad/s
+int currentEncoderCount[2] = {0,0}; //Intilization for Encoder Counts to be used in loop 
+float currentEncoderCountRad[2] = {0,0}; //Converted counts to radian for velocity in rad/s
 int initialEncoderCount[2] = {0,0}; //Found in setup to check for change in counts
-float initialEncoderCountRad[2]; //Radian version of initial count
+float initialEncoderCountRad[2] = {0,0}; //Radian version of initial count
 float vel[2]; //Velocity found from timeelapsed and count/radian change
-float desiredVel[2]; //Desired velocity to achieve in radian/second
-float Kp_pos = 21.3755161809698; //Controller gain for proportional 
-float Ki_pos = 7.27394290572116; //Controller gain for integrator
+float desiredVel[2]={0,0}; //Desired velocity to achieve in radian/second
+float Kp_pos = 9.241809; //Controller gain for proportional 
+float Ki_pos = 1.37281; //Controller gain for integrator
 float Kp = 3.3;
 float voltage[2] = {0,0}; // voltage to be used for speed and position control
 float batteryVoltage = 7.8; //Sets saturation point for battery
 //Defines error values for position and integral
-float pos_error[2]; 
-float desiredPos[2];
-float actualPos[2];
-float integralError[2];
-float error[2];
+float pos_error[2]= {0,0}; 
+float desiredPos[2]= {0,0};
+// float actualPos[2];
+float integralError[2] = {0,0};
+float error[2] = {0,0};
 
 int PWM[2] = {0,0}; //PWM variable to be used for later
 
@@ -66,8 +66,8 @@ void myISR1() {
 
 //ISR to check for a change in state of the encoder
 void myISR2() {
-  if(micros() - lastEncoderTime[0] > 100) {
-    if(digitalRead(encoderInterrupts[0]) == digitalRead(encoderPins[0])) {
+  if(micros() - lastEncoderTime[1] > 100) {
+    if(digitalRead(encoderInterrupts[1]) == digitalRead(encoderPins[1])) {
       count2++;
       count2++;
     } else{
@@ -80,7 +80,7 @@ void myISR2() {
 
 //Function to return encoder counts
 int MyEnc1() {
-  if(digitalRead(encoderInterrupts[1]) != digitalRead(encoderPins[0])) {
+  if(digitalRead(encoderInterrupts[0]) != digitalRead(encoderPins[0])) {
     return(count1+1);
   } else{
     return(count1);
@@ -89,7 +89,7 @@ int MyEnc1() {
 
 //Function to return encoder counts
 int MyEnc2() {
-  if(digitalRead(encoderInterrupts[0]) != digitalRead(encoderPins[0])) {
+  if(digitalRead(encoderInterrupts[1]) != digitalRead(encoderPins[1])) {
     return(count2+1);
   } else{
     return(count2);
@@ -161,20 +161,31 @@ void loop() {
   initialEncoderCountRad[1] = currentEncoderCountRad[1];
 
 
+
   initialTime = millis();
-  if (wheel_1 == 1 ) {
-    desiredPos[0] = PI;
-  } else if (wheel_1 == 0) {
-    desiredPos[0] = 0;
-  }
-  if (wheel_2 == 1) {
-    desiredPos[1] = PI;
-  } else if (wheel_2 == 0) {
-    desiredPos[1] = 0;
-  } 
+  desiredPos[0] = 0;
+  desiredPos[1] = 0;
+  
+  // if (wheel_1 == 1 ) {
+  //   desiredPos[0] = PI;
+  // } else if (wheel_1 == 0) {
+  //   desiredPos[0] = 0;
+  // }
+  // if (wheel_2 == 1) {
+  //   desiredPos[1] = PI;
+  // } else if (wheel_2 == 0) {
+  //   desiredPos[1] = 0;
+  // } 
 
   for (int i = 0; i<2; i++) {
+    
+    if(currentEncoderCountRad[i] >= 2*PI){
+      currentEncoderCountRad[i] = currentEncoderCountRad[i] - (2*PI);
+    }
     pos_error[i] = desiredPos[i] - currentEncoderCountRad[i];
+    if(pos_error[i] >= (2*PI)){
+      pos_error[i] = pos_error[i]-(2*PI);
+    }
     if (desiredVel[i] < 10) {
       integralError[i] = integralError[i] + pos_error[i]*((float)(desired_Ts_ms/1000));
       desiredVel[i] = Kp_pos*pos_error[i] + Ki_pos * integralError[i];
@@ -191,9 +202,26 @@ void loop() {
     }
     PWM[i] = 255*abs(voltage[i])/batteryVoltage;
     analogWrite(MotorVoltage[i],min(PWM[i],255));
+
   }
+    Serial.print(vel[0]);
+    Serial.print("\t");
+    Serial.print(vel[1]);
+    Serial.print("\t");
+    Serial.print(integralError[0]);
+    Serial.print("\t");
+    Serial.print(integralError[1]);
+    Serial.print("\t");
+    Serial.print(pos_error[0]);
+    Serial.print("\t");
+    Serial.print(pos_error[1]);   
+    Serial.print("\t");
+    Serial.print(desiredVel[0]);  
+    Serial.print("\t");
+    Serial.println(desiredVel[1]);
 
-
+    // Serial.print(currentEncoderCountRad[0]);
+    // Serial.println(currentEncoderCountRad[1]);
 
  /* 
 if (currentEncoderCount[0] != desiredEncoderCount{

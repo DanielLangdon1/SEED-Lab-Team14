@@ -11,14 +11,14 @@ int wheel_2=0;
 
 
 // These lines define the pins each motor and encoder pins go to 
-const int MotorVoltage[2] = {9,10}; 
-const int MotorSign[2] = {7,8};
+const int MotorVoltage[2] = {10,9}; 
+const int MotorSign[2] = {8,7};
 const int encoderInterrupts[2] = {2,3};
 const int encoderPins[2] = {5,6};
 const int MotorEnable = 4;
 
 // Defines desired delay time
-unsigned long desired_Ts_ms = 25;
+unsigned long desired_Ts_ms = 10;
 unsigned long last_time_ms;
 
 float lastEncoderTime[2]; //Initializes time variable for use in ISR
@@ -36,10 +36,10 @@ int initialEncoderCount[2] = {0,0}; //Found in setup to check for change in coun
 float initialEncoderCountRad[2] = {0,0}; //Radian version of initial count
 float vel[2]; //Velocity found from timeelapsed and count/radian change
 float desiredVel[2]={0,0}; //Desired velocity to achieve in radian/second
-float Kp_pos = 9.241809; //Controller gain for proportional 
-float Ki_pos = 1.37281; //Controller gain for integrator
-float Kp = 3.3;
-float voltage[2] = {0,0}; // voltage to be used for speed and position control
+float Kp_pos = 9.72256574265674; //Controller gain for proportional 
+float Ki_pos = 1.47909154762947; //Controller gain for integrator
+float Kp = 2.5;
+int voltage[2] = {0,0}; // voltage to be used for speed and position control
 float batteryVoltage = 7.8; //Sets saturation point for battery
 //Defines error values for position and integral
 float pos_error[2]= {0,0}; 
@@ -116,9 +116,6 @@ int MyEnc2() {
 }
 }
 
-
-
-
 void setup() {
   // put your setup code here, to run once:
   // For loop to assign pins as outputs/inputs and sets encoders to high for pullup resistor
@@ -166,26 +163,21 @@ void loop() {
 
   timeElapsed = (float)(millis()-initialTime)/1000;
   currentEncoderCount[0] = MyEnc1();
-
   if (currentEncoderCount[0] >= 3200){ //wraps encoder count around 2pi for wheel 1
     currentEncoderCount[0] = currentEncoderCount[0] - 3200;
   }
   else if (currentEncoderCount[0] <= -3200){
         currentEncoderCount[0] = currentEncoderCount[0] + 3200;
   }
-  
   currentEncoderCountRad[0] = 2*PI*(float)(currentEncoderCount[0])/3200;
-  timeElapsed = (float)(millis()-initialTime)/1000;
   vel[0] = (currentEncoderCountRad[0]-initialEncoderCountRad[0])/timeElapsed;
 
-
   currentEncoderCount[1] = MyEnc2();
-
   if (currentEncoderCount[1] >= 3200){//wraps encoder count around 2pi for wheel 2
     currentEncoderCount[1] = currentEncoderCount[1]- 3200;
   }
-  else if (currentEncoderCount[1]<= -3200){
-        currentEncoderCount[1] = currentEncoderCount[1] +3200;
+  else if (currentEncoderCount[1]<=-3200){
+        currentEncoderCount[1] = currentEncoderCount[1]+3200;
   }
   currentEncoderCountRad[1] = 2*PI*(float)(currentEncoderCount[1])/3200;
   vel[1] = (currentEncoderCountRad[1]-initialEncoderCountRad[1])/timeElapsed;
@@ -195,85 +187,74 @@ void loop() {
   initialEncoderCount[1] = currentEncoderCount[1];
   initialEncoderCountRad[1] = currentEncoderCountRad[1];
 
-
-
   initialTime = millis();
   desiredPos[0] = 0;
   desiredPos[1] = 0;
   
-  // if (wheel_1 == 1 ) {
-  //   desiredPos[0] = PI;
-  // } else if (wheel_1 == 0) {
-  //   desiredPos[0] = 0;
-  // }
-  // if (wheel_2 == 1) {
-  //   desiredPos[1] = PI;
-  // } else if (wheel_2 == 0) {
-  //   desiredPos[1] = 0;
-  // } 
+  if (wheel_1 == 1 ) {
+   desiredPos[0] = PI;
+  } else if (wheel_1 == 0) {
+    desiredPos[0] = 0;
+  }
+  if (wheel_2 == 1) {
+    desiredPos[1] = PI;
+  } else if (wheel_2 == 0) {
+    desiredPos[1] = 0;
+  } 
 
   for (int i = 0; i<2; i++) {
-    
-
     pos_error[i] = desiredPos[i] - currentEncoderCountRad[i];
-
     integralError[i] = integralError[i] + pos_error[i]*((float)(desired_Ts_ms/1000));
     desiredVel[i] = Kp_pos*pos_error[i] + Ki_pos * integralError[i];
-
     error[i] = desiredVel[i] - vel[i];
     voltage[i] = Kp * error[i];
-
-    if (voltage[i] > 0) {
-      digitalWrite(MotorSign[i],HIGH);
+    if (voltage[i] >= 0) {
+      digitalWrite(MotorSign[i],LOW);
     } else {
-      digitalWrite(MotorSign[i], LOW);
+      digitalWrite(MotorSign[i], HIGH);   
     }
     PWM[i] = 255*abs(voltage[i])/batteryVoltage;
     analogWrite(MotorVoltage[i],min(PWM[i],255));
-
   }
+    // Serial.print(voltage[0]);
+    // Serial.print("\t");
+    // Serial.print(voltage[1]);
+    // Serial.print("\t");
     // Serial.print(vel[0]);
     // Serial.print("\t");
     // Serial.print(vel[1]);
     // Serial.print("\t");
-    Serial.print(integralError[0]);
-    Serial.print("\t");
-    Serial.print(integralError[1]);
-    Serial.print("\t pos err ");
-    Serial.print(pos_error[0]);
-    Serial.print("\t");
-    Serial.print(pos_error[1]);   
-    Serial.print("\tdesired vel ");
-    Serial.print(desiredVel[0]);  
-    Serial.print("\t");
-    Serial.print(desiredVel[1]);
-    Serial.print("\t encoder");
-    Serial.print(initialEncoderCountRad[0]);
-    Serial.print("\t");
-    Serial.print(initialEncoderCountRad[1]);
-    Serial.print("\t");
-    Serial.print(currentEncoderCountRad[0]);
-    Serial.print("\t");
-    Serial.print(currentEncoderCountRad[1]);
-    Serial.print("\t");
-    Serial.print(currentEncoderCount[0]);
-    Serial.print("\t");
-    Serial.println(currentEncoderCount[1]);
+    // Serial.print(integralError[0]);
     // Serial.print("\t");
-    // Serial.print(count1);
+    // Serial.print(integralError[1]);
+    // Serial.print("\t pos err ");
+    // Serial.print(pos_error[0]);
     // Serial.print("\t");
-    // Serial.println(count2);
-
-
-
+    // Serial.print(pos_error[1]);   
+    // Serial.print("\tdesired vel ");
+    // Serial.print(desiredVel[0]);  
+    // Serial.print("\t");
+    // Serial.println(desiredVel[1]);
+    // Serial.print("\t encoder");
+    // Serial.print(initialEncoderCountRad[0]);
+    // Serial.print("\t");
+    // Serial.print(initialEncoderCountRad[1]);
+    // Serial.print("\t");
+    // Serial.print(currentEncoderCountRad[0]);
+    // Serial.print("\t");
+    // Serial.print(currentEncoderCountRad[1]);
+    // Serial.print("\t");
+    // Serial.print(currentEncoderCount[0]);
+    // Serial.print("\t");
+    // Serial.println(currentEncoderCount[1]);
   while(millis()<last_time_ms+desired_Ts_ms){
     //wait till desired time passes
   }
   last_time_ms=millis();
 }
+
 // printReceived helps us see what data we are getting from the leader
 void printReceived() {
-
   Serial.print("Message: ");
   for (int i=0;i<msgLength;i++) {
     Serial.print(String((char) instruction[i]));
@@ -300,7 +281,6 @@ void receive() {
   while (Wire.available()) {
     instruction[msgLength] = Wire.read();
     msgLength++;
-    
   }
 }
 

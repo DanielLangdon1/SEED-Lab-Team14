@@ -173,11 +173,10 @@ void loop() {
   vel[0] = (currentEncoderCountRad[0]-initialEncoderCountRad[0])/timeElapsed;
 
   currentEncoderCount[1] = MyEnc2();
-  if (currentEncoderCount[1] >= 3200){//wraps encoder count around 2pi for wheel 2
-    currentEncoderCount[1] = currentEncoderCount[1]- 3200;
-  }
-  else if (currentEncoderCount[1]<=-3200){
-        currentEncoderCount[1] = currentEncoderCount[1]+3200;
+  if (currentEncoderCount[1] >= 3200){ //wraps encoder count around 2pi for wheel 2
+    currentEncoderCount[1] = currentEncoderCount[1] - 3200;
+  } else if (currentEncoderCount[1]<=-3200){
+    currentEncoderCount[1] = currentEncoderCount[1]+3200;
   }
   currentEncoderCountRad[1] = 2*PI*(float)(currentEncoderCount[1])/3200;
   vel[1] = (currentEncoderCountRad[1]-initialEncoderCountRad[1])/timeElapsed;
@@ -186,10 +185,7 @@ void loop() {
   initialEncoderCountRad[0] = currentEncoderCountRad[0];
   initialEncoderCount[1] = currentEncoderCount[1];
   initialEncoderCountRad[1] = currentEncoderCountRad[1];
-
   initialTime = millis();
-  desiredPos[0] = 0;
-  desiredPos[1] = 0;
   
   if (wheel_1 == 1 ) {
    desiredPos[0] = PI;
@@ -216,37 +212,7 @@ void loop() {
     PWM[i] = 255*abs(voltage[i])/batteryVoltage;
     analogWrite(MotorVoltage[i],min(PWM[i],255));
   }
-    // Serial.print(voltage[0]);
-    // Serial.print("\t");
-    // Serial.print(voltage[1]);
-    // Serial.print("\t");
-    // Serial.print(vel[0]);
-    // Serial.print("\t");
-    // Serial.print(vel[1]);
-    // Serial.print("\t");
-    // Serial.print(integralError[0]);
-    // Serial.print("\t");
-    // Serial.print(integralError[1]);
-    // Serial.print("\t pos err ");
-    // Serial.print(pos_error[0]);
-    // Serial.print("\t");
-    // Serial.print(pos_error[1]);   
-    // Serial.print("\tdesired vel ");
-    // Serial.print(desiredVel[0]);  
-    // Serial.print("\t");
-    // Serial.println(desiredVel[1]);
-    // Serial.print("\t encoder");
-    // Serial.print(initialEncoderCountRad[0]);
-    // Serial.print("\t");
-    // Serial.print(initialEncoderCountRad[1]);
-    // Serial.print("\t");
-    // Serial.print(currentEncoderCountRad[0]);
-    // Serial.print("\t");
-    // Serial.print(currentEncoderCountRad[1]);
-    // Serial.print("\t");
-    // Serial.print(currentEncoderCount[0]);
-    // Serial.print("\t");
-    // Serial.println(currentEncoderCount[1]);
+
   while(millis()<last_time_ms+desired_Ts_ms){
     //wait till desired time passes
   }

@@ -1,3 +1,7 @@
+////TODO take out redundancy with wheel calculations
+// make state machine for phi controller
+
+
 #include <Wire.h>
 #define MY_ADDR 8
 #define PI 3.14159265358979323 // Defines irrational number PI for mathematical use later
@@ -69,8 +73,19 @@ float yNew = 0;
 float xOld = 0;
 float yOld = 0;
 
-float phi = 0;
+float phiNew = 0;
 float phiOld = 0;
+
+float desiredPhi = 0;
+float phiError = 0;
+float intErrorPhi = 0;
+float phiVelError = 0;
+float phiVel = 0;
+float desiredPhiVel = 0;
+float KpPhiPos = 7.025265;
+float KiPhiPos = .740405;
+float KpPhiVel = .213320;
+
 
 float xVel = 0;
 float yVel = 0;
@@ -200,13 +215,15 @@ void setup() {
 
 void loop() {
     ////////////////////////////////////////////////////////////////////calculate new position data
-  xNew = cos(phiOld)*(((dist2) + (dist1))/2);
-  yNew = sin(phiOld)*(((dist2) + (dist1))/2);
-  xVel = cos(phi)*(linVel1+linVel2)/2;
-  yVel = sin(phi)*(linVel1+linVel2)/2;
-  phi = (((dist1-oldRadians1*r) + (dist2-oldRadians1*r)/b));
   xOld = xNew;
   yOld = yNew;
+  phiOld = phiNew;
+  xNew = cos(phiOld)*(((dist2) + (dist1))/2);
+  yNew = sin(phiOld)*(((dist2) + (dist1))/2);
+  xVel = cos(phiNew)*(linVel1+linVel2)/2;
+  yVel = sin(phiNew)*(linVel1+linVel2)/2;
+  phiNew = (((dist1-oldRadians1*r) + (dist2-oldRadians1*r)/b));
+
 
 
   // put your main code here, to run repeatedly:
@@ -239,7 +256,7 @@ void loop() {
   }
   initialTime = millis();
   
-  if (wheel_1 == 1 ) { //interpret instructions
+  if (wheel_1 == 1 ) { //interpret instructions from pi
    desiredPos[0] = PI;
   } else if (wheel_1 == 0) {
     desiredPos[0] = 0;
@@ -249,8 +266,18 @@ void loop() {
   } else if (wheel_2 == 0) {
     desiredPos[1] = 0;
   } 
+  switch mode;
+  case turn {
+    phiError = desiredPhi -phiNew;
+    intErrorPhi = intErrorPhi + phiError*(K_i)*((float)(desired_Ts_ms/1000));
+    desiredPhi = KpPhiPos*phiError + KiPhiPos * intErrorPhi;
+    phiVelError = desiredPhiVel - phiVel;
+  }
+  case move{
+    if 
 
-  for (int i = 0; i<2; i++) {
+
+  for (int i = 0; i<2; i++) { // Porportional controler for each wheel
     pos_error[i] = desiredPos[i] - currentEncoderCountRad[i];
     integralError[i] = integralError[i] + pos_error[i]*((float)(desired_Ts_ms/1000));
     desiredVel[i] = Kp_pos*pos_error[i] + Ki_pos * integralError[i];
@@ -263,6 +290,8 @@ void loop() {
     }
     PWM[i] = 255*abs(voltage[i])/batteryVoltage;
     analogWrite(MotorVoltage[i],min(PWM[i],255));
+  }
+
   }
 
   while(millis()<last_time_ms+desired_Ts_ms){
@@ -280,10 +309,10 @@ void printReceived() {
   }
   Serial.println(""); 
 
-  wheel_1 =  instruction[0] - 48;
+  wheel_1 =  instruction[0] - 48; // convert to 1 or 0
   wheel_2 = instruction[1] - 48;
 
-  Serial.print("Wheel 1: ");
+  Serial.print("Wheel 1: "); // display instructions from pi
   Serial.print(wheel_1);
   Serial.println("");
 

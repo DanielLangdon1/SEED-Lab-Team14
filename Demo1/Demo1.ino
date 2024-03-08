@@ -177,7 +177,7 @@ void setup() {
 
 
   desiredPhi = -PI/2;
-  desiredDis = 1; //meters
+  desiredDis = 3; //in
 
 }
 
@@ -293,12 +293,9 @@ void loop() {
         PWM[i] = 255*abs(voltage[i])/batteryVoltage; //run motors with calculated PID 
         analogWrite(MotorVoltage[i],min(PWM[i],255));
       }
-      phiError = phiNew - desiredPhi;
-      intErrorPhi = intErrorPhi + phiError *((float)(desired_Ts_ms/1000));
-      desiredPhiVel = KpPhiPos*phiError +KiPhiPos*intErrorPhi;
-
-      
-
+  phiError = phiNew - desiredPhi;
+  intErrorPhi = intErrorPhi + phiError *((float)(desired_Ts_ms/1000));
+  desiredPhiVel = KpPhiPos*phiError +KiPhiPos*intErrorPhi;
 
   while(millis()<last_time_ms+desired_Ts_ms){
     //wait till desired time passes

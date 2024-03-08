@@ -209,12 +209,11 @@ void loop() {
 
 
   for(int i = 0;i<2;i++){ // configure encoders
-
-    // if (currentEncoderCount[i] >= 3200){ //wraps encoder count around 2pi for wheel 2
-    //   currentEncoderCount[i] = currentEncoderCount[i] - 3200;
-    // } else if (currentEncoderCount[i]<=-3200){
-    //   currentEncoderCount[i] = currentEncoderCount[i]+3200;
-    // }
+    if (currentEncoderCount[i] >= 3200){ //wraps encoder count around 2pi for wheel 2
+      currentEncoderCount[i] = currentEncoderCount[i] - 3200;
+    } else if (currentEncoderCount[i]<=-3200){
+      currentEncoderCount[i] = currentEncoderCount[i]+3200;
+    }
     currentEncoderCountRad[i] = 2*PI*(float)(currentEncoderCount[i])/3200;
     vel[i] = (currentEncoderCountRad[i]-initialEncoderCountRad[i])/timeElapsed;
     distance[i] = currentEncoderCountRad[i]*r;
@@ -230,21 +229,12 @@ void loop() {
   initialTime = millis();
   switch (mode){
     case 0:
-      desiredDis = 0;
+      //desiredDis = 0;
       if (desiredPhi != 0){ ///calculate desired anglular position for each wheel based off of phi
         desiredPos[0] = desiredPhi*(b/(2*r));
       }else if (desiredPhi < 0){
         desiredPos[0] = -1*desiredPhi*(b/(2*r));       
       }
-      // if((currentEncoderCount[0] != -1*currentEncoderCount[1])){
-      //   if(phiError > 0 ){
-      //     desiredVel[0] ++;
-      //     desiredVel[1] --;
-      //   }else if(phiError < 0){
-      //     desiredVel[0] --;
-      //     desiredVel[1] ++;
-      //   }
-      // }
       desiredPos[1] = -1*desiredPos[0];
       Serial.print(phiNew/(PI/180));
       Serial.print("\t");
@@ -257,24 +247,12 @@ void loop() {
         mode = 1;
       }
 
- 
-        // if (vel[0] != -1*vel[1]){
-        //   if(vel[0]>vel[1]){
-            
-        //   }
-        //   if(vel[0]<vel[1]){
-            
-        //   }
-        // }
-        // Serial.println(phiVel);
       break;
-
     case 1:
       desiredPos[0] = desiredDis/(2*PI*r);
       desiredPos[1] = desiredDis/(2*PI*r);
       desiredPhi = 0;
 
-      
       if (desiredDis != currentEncoderCountRad[1]){
         if(vel[0]>vel[1]){
           desiredVel[1]++;
@@ -299,7 +277,6 @@ void loop() {
         analogWrite(MotorVoltage[1],PWM[1]);
 
         break;
-      // }
       }
       for (int i = 0; i<2; i++) { // Calculate Porportional controler for each wheel
         pos_error[i] = desiredPos[i] - currentEncoderCountRad[i]; // calculate position error from desired pos

@@ -46,7 +46,7 @@ float error[2] = {0,0};
 float b = 0.3556; //m between middles of wheels
 float r = 0.07; //wheel rad m
 float distanceTraveled = 0;
-int mode = 0; ///0 for turn 1 for move
+int mode = 1; ///0 for turn 1 for move
 
 float xVel1 = 0;
 float xVel2 = 0;
@@ -177,7 +177,7 @@ void setup() {
 
 
   desiredPhi = -PI/2;
-  desiredDis = 500; //meters
+  desiredDis = 1; //meters
 
 }
 
@@ -253,19 +253,9 @@ void loop() {
       desiredPos[1] = desiredDis/(2*PI*r);
       desiredPhi = 0;
 
-      if (desiredDis != currentEncoderCountRad[1]){
-        if(vel[0]>vel[1]){
-          desiredVel[1]++;
-          desiredVel[0]--;
-        }
-        if(vel[0]<vel[1]){
-          desiredVel[0]++;
-          desiredVel[1]--;
-        }
-      }
-      Serial.print(pos_error[1]/(PI/180));
+      Serial.print(desiredPos[0]);
       Serial.print("\t");
-      Serial.println(phiError/(PI/180));
+      Serial.print(phiError/(PI/180));
       Serial.print("\t");
       Serial.print(currentEncoderCount[0]);
       Serial.print("\t");
@@ -306,6 +296,7 @@ void loop() {
       phiError = phiNew - desiredPhi;
       intErrorPhi = intErrorPhi + phiError *((float)(desired_Ts_ms/1000));
       desiredPhiVel = KpPhiPos*phiError +KiPhiPos*intErrorPhi;
+
       
 
 

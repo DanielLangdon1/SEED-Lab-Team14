@@ -1,18 +1,6 @@
-////TODO take out redundancy with wheel calculations
-// make state machine for phi controller
-
-
 #include <Wire.h>
 #define MY_ADDR 8
 #define PI 3.14159265358979323 // Defines irrational number PI for mathematical use later
-
-// Global variables to be used for I2C communication
-volatile uint8_t offset = 0;
-volatile uint8_t instruction[32] = {0};
-volatile uint8_t msgLength = 0;
-int wheel_1=0;
-int wheel_2=0;
-
 
 // These lines define the pins each motor and encoder pins go to 
 const int MotorVoltage[2] = {10,9}; 
@@ -52,19 +40,13 @@ float desiredPos[2]= {0,0};
 float integralError[2] = {0,0};
 float error[2] = {0,0};
 
+
+
 ///////position variables
-float b = 0.355; //m between middles of wheels
-float r = 0.0685; //wheel rad m
-float angVel1 = 0;
-float angVel2 = 0;
-float linVel1 = 0;
-float linVel2 = 0;
-float dist1 = 0;
-float dist2 = 0;
-float radians1 = 0;
-float radians2 = 0;
-float oldRadians1 = 0;
-float oldRadians2 = 0;
+float b = 0.3556; //m between middles of wheels
+float r = 0.07; //wheel rad m
+float distanceTraveled = 0;
+int mode = 0; ///0 for turn 1 for move
 
 float xVel1 = 0;
 float xVel2 = 0;
@@ -72,6 +54,8 @@ float xNew = 0;
 float yNew = 0;
 float xOld = 0;
 float yOld = 0;
+float distance[2] = {0,0};
+
 
 float phiNew = 0;
 float phiOld = 0;
@@ -89,7 +73,7 @@ float KpPhiVel = .213320;
 
 float xVel = 0;
 float yVel = 0;
-
+float desiredDis;
 
 
 int PWM[2] = {0,0}; //PWM variable to be used for later
@@ -125,52 +109,41 @@ void myISR2() {
 //Function to return encoder counts
 int MyEnc1() {
   if(digitalRead(encoderInterrupts[0]) != digitalRead(encoderPins[0])) {
-    if (count1 >= 3200) {
-      count1-=3200;
-    } else if (count1 <= -3200) {
-        count1 += 3200;
-    }
+    // if (count1 >= 3200) {
+    //   count1-=3200;
+    // } else if (count1 <= -3200) {
+    //     count1 += 3200;
+    // }
     return(count1+1);
   } else{
-     if (count1 >= 3200) {
-      count1-=3200;
-    } else if (count1 <= -3200) {
-        count1 += 3200;
-    }
+    //  if (count1 >= 3200) {
+    //   count1-=3200;
+    // } else if (count1 <= -3200) {
+    //     count1 += 3200;
+    // }
     return(count1);
   }
-
-  radians1 = (encoder1Count*2*pi)/3200;
-  angVel1 = ((radians1-oldRadians1)/(currentTime-lastTime1));   // angular velocity
-  linVel1 = angVel1*r;                                         // linear velocity
-  dist1 = radians1*r;                                          // distance traveled;
-  oldRadians1 = radians1; 
-
+  
 }
 
 //Function to return encoder counts
 int MyEnc2() {
   if(digitalRead(encoderInterrupts[1]) != digitalRead(encoderPins[1])) {
-  if (count1 >= 3200) {
-      count2-=3200;
-    } else if (count1 <= -3200) {
-        count2 += 3200;
-    }
+  // if (count1 >= 3200) {
+  //     count2-=3200;
+  //   } else if (count1 <= -3200) {
+  //       count2 += 3200;
+  //   }
     return(count2+1);
   } else{
-     if (count2 >= 3200) {
-      count2-=3200;
-    } else if (count2 <= -3200) {
-        count2 += 3200;
-    }
+    //  if (count2 >= 3200) {
+    //   count2-=3200;
+    // } else if (count2 <= -3200) {
+    //     count2 += 3200;
+    // }
     return(count2);
   }
 
-  radians2 = (encoder2Count*2*pi)/3200;
-  angVel2 = ((radians2-oldRadians2)/(currentTime-lastTime2));   //angular velocity
-  linVel2 = angVel2*r;                                         //linear velocity
-  dist2 = radians2*r;                                          //left wheel distance traveled;
-  oldRadians2 = radians2;                                      //stores current position for later reference
 
 }
 
@@ -198,13 +171,13 @@ void setup() {
   Serial.begin(115200);
   // We want to control the built-in LED (pin 13)
   pinMode(LED_BUILTIN, OUTPUT);
-  // Initialize I2C
-  Wire.begin(MY_ADDR);
-  // Set callbacks for I2C interrupts
-  Wire.onReceive(receive);
 
   startTime = millis();
   initialTime = millis();
+
+
+  desiredPhi = -PI/2;
+  desiredDis = 500; //meters
 
 }
 
@@ -215,14 +188,13 @@ void setup() {
 
 void loop() {
     ////////////////////////////////////////////////////////////////////calculate new position data
-  xOld = xNew;
-  yOld = yNew;
-  phiOld = phiNew;
-  xNew = cos(phiOld)*(((dist2) + (dist1))/2);
-  yNew = sin(phiOld)*(((dist2) + (dist1))/2);
-  xVel = cos(phiNew)*(linVel1+linVel2)/2;
-  yVel = sin(phiNew)*(linVel1+linVel2)/2;
-  phiNew = (((dist1-oldRadians1*r) + (dist2-oldRadians1*r)/b));
+  // xOld = xNew;
+  // yOld = yNew;
+  // phiOld = phiNew;
+  // xNew = cos(phiOld)*(((dist2) + (dist1))/2);
+  // yNew = sin(phiOld)*(((dist2) + (dist1))/2);
+  // xVel = cos(phiNew)*(linVel1+linVel2)/2;
+  // yVel = sin(phiNew)*(linVel1+linVel2)/2;
 
 
 
@@ -230,11 +202,6 @@ void loop() {
   lastTime = millis();
   //Compute current time
   currentTime = (float)((lastTime-startTime)/1000);
-  // If there is data on the buffer, read it
-  if (msgLength > 0) {
-    printReceived();
-    msgLength = 0;
-  }
 
   timeElapsed = (float)(millis()-initialTime)/1000;
   currentEncoderCount[0] = MyEnc1();
@@ -243,91 +210,131 @@ void loop() {
 
   for(int i = 0;i<2;i++){ // configure encoders
 
-    if (currentEncoderCount[i] >= 3200){ //wraps encoder count around 2pi for wheel 2
-      currentEncoderCount[i] = currentEncoderCount[i] - 3200;
-    } else if (currentEncoderCount[i]<=-3200){
-      currentEncoderCount[i] = currentEncoderCount[i]+3200;
-    }
+    // if (currentEncoderCount[i] >= 3200){ //wraps encoder count around 2pi for wheel 2
+    //   currentEncoderCount[i] = currentEncoderCount[i] - 3200;
+    // } else if (currentEncoderCount[i]<=-3200){
+    //   currentEncoderCount[i] = currentEncoderCount[i]+3200;
+    // }
     currentEncoderCountRad[i] = 2*PI*(float)(currentEncoderCount[i])/3200;
     vel[i] = (currentEncoderCountRad[i]-initialEncoderCountRad[i])/timeElapsed;
+    distance[i] = currentEncoderCountRad[i]*r;
 
+  }
+  phiNew = (((initialEncoderCountRad[0]*r - distance[1]) + (initialEncoderCountRad[1]*r-distance[1]))/b);
+  phiVel = (((vel[0]*r) - (vel[1]*r))/b);
+  for(int i = 0;i<2;i++){ 
     initialEncoderCount[i] = currentEncoderCount[i];
     initialEncoderCountRad[i] = currentEncoderCountRad[i];
   }
+
   initialTime = millis();
-  
-  if (wheel_1 == 1 ) { //interpret instructions from pi
-   desiredPos[0] = PI;
-  } else if (wheel_1 == 0) {
-    desiredPos[0] = 0;
-  }
-  if (wheel_2 == 1) {
-    desiredPos[1] = PI;
-  } else if (wheel_2 == 0) {
-    desiredPos[1] = 0;
-  } 
-  switch mode;
-  case turn {
-    phiError = desiredPhi -phiNew;
-    intErrorPhi = intErrorPhi + phiError*(K_i)*((float)(desired_Ts_ms/1000));
-    desiredPhi = KpPhiPos*phiError + KiPhiPos * intErrorPhi;
-    phiVelError = desiredPhiVel - phiVel;
-  }
-  case move{
-    if 
+  switch (mode){
+    case 0:
+      desiredDis = 0;
+      if (desiredPhi != 0){ ///calculate desired anglular position for each wheel based off of phi
+        desiredPos[0] = desiredPhi*(b/(2*r));
+      }else if (desiredPhi < 0){
+        desiredPos[0] = -1*desiredPhi*(b/(2*r));       
+      }
+      // if((currentEncoderCount[0] != -1*currentEncoderCount[1])){
+      //   if(phiError > 0 ){
+      //     desiredVel[0] ++;
+      //     desiredVel[1] --;
+      //   }else if(phiError < 0){
+      //     desiredVel[0] --;
+      //     desiredVel[1] ++;
+      //   }
+      // }
+      desiredPos[1] = -1*desiredPos[0];
+      Serial.print(phiNew/(PI/180));
+      Serial.print("\t");
+      Serial.println(phiError);
+      Serial.print("\t");
+      Serial.print(currentEncoderCount[0]);
+      Serial.print("\t");
+      Serial.println(currentEncoderCount[1]);
+      if(desiredPhi == phiNew + PI/90 || desiredPhi == phiNew - PI/90){
+        mode = 1;
+      }
 
+ 
+        // if (vel[0] != -1*vel[1]){
+        //   if(vel[0]>vel[1]){
+            
+        //   }
+        //   if(vel[0]<vel[1]){
+            
+        //   }
+        // }
+        // Serial.println(phiVel);
+      break;
 
-  for (int i = 0; i<2; i++) { // Porportional controler for each wheel
-    pos_error[i] = desiredPos[i] - currentEncoderCountRad[i];
-    integralError[i] = integralError[i] + pos_error[i]*((float)(desired_Ts_ms/1000));
-    desiredVel[i] = Kp_pos*pos_error[i] + Ki_pos * integralError[i];
-    error[i] = desiredVel[i] - vel[i];
-    voltage[i] = Kp * error[i];
-    if (voltage[i] >= 0) {
-      digitalWrite(MotorSign[i],LOW);
-    } else {
-      digitalWrite(MotorSign[i], HIGH);   
-    }
-    PWM[i] = 255*abs(voltage[i])/batteryVoltage;
-    analogWrite(MotorVoltage[i],min(PWM[i],255));
-  }
+    case 1:
+      desiredPos[0] = desiredDis/(2*PI*r);
+      desiredPos[1] = desiredDis/(2*PI*r);
+      desiredPhi = 0;
 
-  }
+      
+      if (desiredDis != currentEncoderCountRad[1]){
+        if(vel[0]>vel[1]){
+          desiredVel[1]++;
+          desiredVel[0]--;
+        }
+        if(vel[0]<vel[1]){
+          desiredVel[0]++;
+          desiredVel[1]--;
+        }
+      }
+      Serial.print(pos_error[1]/(PI/180));
+      Serial.print("\t");
+      Serial.println(phiError/(PI/180));
+      Serial.print("\t");
+      Serial.print(currentEncoderCount[0]);
+      Serial.print("\t");
+      Serial.println(currentEncoderCount[1]);
+         
+      break;
+      case 3:
+        analogWrite(MotorVoltage[0],PWM[0]);
+        analogWrite(MotorVoltage[1],PWM[1]);
+
+        break;
+      // }
+      }
+      for (int i = 0; i<2; i++) { // Calculate Porportional controler for each wheel
+        pos_error[i] = desiredPos[i] - currentEncoderCountRad[i]; // calculate position error from desired pos
+        integralError[i] = integralError[i] + pos_error[i]*((float)(desired_Ts_ms/1000)); // integral error
+        desiredVel[i] = Kp_pos*pos_error[i] + Ki_pos * integralError[i]; // calculate desired velocity for each wheel with K values found in simulation
+        error[i] = desiredVel[i] - vel[i];
+        voltage[i] = Kp * error[i];
+        if (voltage[i] >= 0) {
+          digitalWrite(MotorSign[i],LOW);
+        } else {
+          digitalWrite(MotorSign[i], HIGH);   
+        }
+
+      //   if(phiError != 0){
+      //     if(phiError > 0 ){
+      //       desiredVel[0] -= phiError*(b/(2*r));
+      //       desiredVel[1] += phiError*(b/(2*r));
+      //     }else if(phiError < 0){
+      //       desiredVel[0] += phiError*(b/(2*r));
+      //       desiredVel[1] -= phiError*(b/(2*r));
+      //     }
+      // }
+
+        PWM[i] = 255*abs(voltage[i])/batteryVoltage; //run motors with calculated PID 
+        analogWrite(MotorVoltage[i],min(PWM[i],255));
+      }
+      phiError = phiNew - desiredPhi;
+      intErrorPhi = intErrorPhi + phiError *((float)(desired_Ts_ms/1000));
+      desiredPhiVel = KpPhiPos*phiError +KiPhiPos*intErrorPhi;
+      
+
 
   while(millis()<last_time_ms+desired_Ts_ms){
     //wait till desired time passes
   }
   last_time_ms=millis();
-
-}
-
-// printReceived helps us see what data we are getting from the leader
-void printReceived() {
-  Serial.print("Message: ");
-  for (int i=0;i<msgLength;i++) {
-    Serial.print(String((char) instruction[i]));
-  }
-  Serial.println(""); 
-
-  wheel_1 =  instruction[0] - 48; // convert to 1 or 0
-  wheel_2 = instruction[1] - 48;
-
-  Serial.print("Wheel 1: "); // display instructions from pi
-  Serial.print(wheel_1);
-  Serial.println("");
-
-  Serial.print("Wheel 2: ");
-  Serial.print(wheel_2);
-  Serial.println("");
-
-}
-// function called when an I2C interrupt event happens
-void receive() {
-  // Set the offset, this will always be the first byte.
-  offset = Wire.read();
-  // If there is information after the offset, it is telling us more about the command.
-  while (Wire.available()) {
-    instruction[msgLength] = Wire.read();
-    msgLength++;
-  }
+  // Serial.print(desiredPos[0]);
 }

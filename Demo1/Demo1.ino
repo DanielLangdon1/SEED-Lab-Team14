@@ -34,19 +34,22 @@ float Kp = 2.5;
 int voltage[2] = {0,0}; // voltage to be used for speed and position control
 float batteryVoltage = 7.8; //Sets saturation point for battery
 //Defines error values for position and integral
-float pos_error[2]= {0,0}; 
-float desiredPos[2]= {0,0};
+float pos_error[2]= {0,0}; //wheel error Radians
+float desiredPos[2]= {0,0}; // desired position of each wheel Radians
 // float actualPos[2];
-float integralError[2] = {0,0};
-float error[2] = {0,0};
+float integralError[2] = {0,0}; // m*s
+float error[2] = {0,0};  //velocity error for each wheel Radians
 
+// float deltaV = 0;
+// float vBar = 0;
 
 
 ///////position variables
-float b = 0.3556; //m between middles of wheels
+
+float b = 0.3655; //m between middles of wheels
 float r = 0.07; //wheel rad m
 float distanceTraveled = 0;
-int mode = 1; ///0 for turn 1 for move
+int mode = 0; ///0 for turn, 1 for move, 3 for debug/wait
 
 float xVel1 = 0;
 float xVel2 = 0;
@@ -176,8 +179,8 @@ void setup() {
   initialTime = millis();
 
 
-  desiredPhi = -PI/2;
-  desiredDis = 3; //in
+  desiredPhi = PI/2;
+  desiredDis = 1; //meters
 
 }
 
@@ -187,33 +190,22 @@ void setup() {
 
 
 void loop() {
-    ////////////////////////////////////////////////////////////////////calculate new position data
-  // xOld = xNew;
-  // yOld = yNew;
-  // phiOld = phiNew;
-  // xNew = cos(phiOld)*(((dist2) + (dist1))/2);
-  // yNew = sin(phiOld)*(((dist2) + (dist1))/2);
-  // xVel = cos(phiNew)*(linVel1+linVel2)/2;
-  // yVel = sin(phiNew)*(linVel1+linVel2)/2;
 
-
-
-  // put your main code here, to run repeatedly:
   lastTime = millis();
-  //Compute current time
-  currentTime = (float)((lastTime-startTime)/1000);
+  currentTime = (float)((lastTime-startTime)/1000);//Compute current time
+  timeElapsed = (float)(millis()-initialTime)/1000; // total time
 
-  timeElapsed = (float)(millis()-initialTime)/1000;
   currentEncoderCount[0] = MyEnc1();
   currentEncoderCount[1] = MyEnc2();
 
 
   for(int i = 0;i<2;i++){ // configure encoders
-    if (currentEncoderCount[i] >= 3200){ //wraps encoder count around 2pi for wheel 2
-      currentEncoderCount[i] = currentEncoderCount[i] - 3200;
-    } else if (currentEncoderCount[i]<=-3200){
-      currentEncoderCount[i] = currentEncoderCount[i]+3200;
-    }
+
+    // if (currentEncoderCount[i] >= 3200){ //wraps encoder count around 2pi for wheel 2
+    //   currentEncoderCount[i] = currentEncoderCount[i] - 3200;
+    // } else if (currentEncoderCount[i]<=-3200){
+    //   currentEncoderCount[i] = currentEncoderCount[i]+3200;
+    // }
     currentEncoderCountRad[i] = 2*PI*(float)(currentEncoderCount[i])/3200;
     vel[i] = (currentEncoderCountRad[i]-initialEncoderCountRad[i])/timeElapsed;
     distance[i] = currentEncoderCountRad[i]*r;
@@ -229,74 +221,135 @@ void loop() {
   initialTime = millis();
   switch (mode){
     case 0:
-      //desiredDis = 0;
-      if (desiredPhi != 0){ ///calculate desired anglular position for each wheel based off of phi
+      Serial.print("mode 0 ");
+      if (desiredPhi > 0){ ///calculate desired anglular position for each wheel based off of phi
         desiredPos[0] = desiredPhi*(b/(2*r));
+        desiredPos[1] = -1*desiredPhi*(b/(2*r));
       }else if (desiredPhi < 0){
-        desiredPos[0] = -1*desiredPhi*(b/(2*r));       
+        desiredPos[0] = -1*desiredPhi*(b/(2*r));  
+        desiredPos[1] = desiredPhi*(b/(2*r));     
       }
-      desiredPos[1] = -1*desiredPos[0];
+      // phiVelError = desiredPhiVel - phiVel;
+      //   if(phiVelError > 0 ){
+      //     desiredVel[0] -= phiError*(b/(2*r))*KpPhiPos;
+      //     desiredVel[1] += phiError*(b/(2*r))*KpPhiPos;
+      //   }else if(phiVelError < 0){
+      //     desiredVel[0] += phiError*(b/(2*r))*KpPhiPos;
+      //     desiredVel[1] -= phiError*(b/(2*r))*KpPhiPos;
+      //   }
+      phiError = phiNew - desiredPhi;
+      if(phiError > 0 ){
+        desiredPos[0] += phiError*(b/(2*r));
+        desiredPos[1] -= phiError*(b/(2*r));
+      }
+      if(phiError < 0){
+        desiredPos[0] -= phiError*(b/(2*r));
+        desiredPos[1] += phiError*(b/(2*r));
+      }
+      
+
+      
+      Serial.print(desiredPhi);
+      Serial.print("\t");
       Serial.print(phiNew/(PI/180));
-      Serial.print("\t");
-      Serial.println(phiError);
-      Serial.print("\t");
-      Serial.print(currentEncoderCount[0]);
-      Serial.print("\t");
-      Serial.println(currentEncoderCount[1]);
-      if(desiredPhi == phiNew + PI/90 || desiredPhi == phiNew - PI/90){
-        mode = 1;
-      }
-
-      break;
-    case 1:
-      desiredPos[0] = desiredDis/(2*PI*r);
-      desiredPos[1] = desiredDis/(2*PI*r);
-      desiredPhi = 0;
-
-      Serial.print(desiredPos[0]);
       Serial.print("\t");
       Serial.print(phiError/(PI/180));
       Serial.print("\t");
       Serial.print(currentEncoderCount[0]);
       Serial.print("\t");
       Serial.println(currentEncoderCount[1]);
+      if(phiNew < desiredPhi+0.0174533 && phiNew > desiredPhi-0.0174533){
+        while(millis() < 5000){}
+        mode = 1;
+      }
+
+      break;
+
+    case 1: // mode to move straight ahead
+      phiError = 0;
+      Serial.print("mode 1 ");
+      desiredPos[0] = desiredDis/(r);
+      desiredPos[1] = desiredDis/(r);
+      distanceTraveled = (r*(currentEncoderCountRad[0] + currentEncoderCountRad[1]))/(2);
+      // desiredPhi = 0;
+      // desiredVel[0] = desiredVel[1];
+
+      Serial.print(error[1]);
+      Serial.print("\t");
+      Serial.print(error[0]);
+      Serial.print("\t");
+      Serial.print(phiError/(PI/180));
+      Serial.print("\t"); 
+      Serial.print(desiredPos[1]);
+      Serial.print("\t");
+      Serial.print(desiredPos[0]);
+      Serial.print("\t");
+      Serial.print(distanceTraveled);
+      Serial.print("\t");
+      Serial.println(currentEncoderCountRad[1]);
+      if(distanceTraveled < desiredDis+0.0254 && distanceTraveled > desiredDis-0.0254){
+        mode = 3;
+
+      }
          
       break;
       case 3:
-        analogWrite(MotorVoltage[0],PWM[0]);
-        analogWrite(MotorVoltage[1],PWM[1]);
-
+        desiredPhi = phiNew + PI/8;
+        // digitalWrite(MotorSign[1],HIGH);
+        // digitalWrite(MotorSign[0],HIGH);
+        // analogWrite(MotorVoltage[0],255);
+        // analogWrite(MotorVoltage[1],255);
+        Serial.print("reached destination");
         break;
       }
+      // phiError = phiNew - desiredPhi;
+      // intErrorPhi = intErrorPhi + phiError *((float)(desired_Ts_ms/1000));
+      // desiredPhiVel = KpPhiPos*phiError + KiPhiPos*intErrorPhi;
+      // if(phiError != 0 ){
+      //   if(phiError > 0 ){
+      //     desiredPos[0] -= phiError*(b/(2*r));
+      //     desiredPos[1] += phiError*(b/(2*r));
+      //   }else if(phiError < 0){
+      //     desiredPos[0] += phiError*(b/(2*r));
+      //     desiredPos[1] -= phiError*(b/(2*r));
+      //   }
+      // }
+      
+      // phiVelError = desiredPhiVel - phiVel;
+      // if(phiVelError != 0){
+      //   if(phiVelError > 0 ){
+      //     desiredVel[0] -= phiError*(b/(2*r))*KpPhiPos;
+      //     desiredVel[1] += phiError*(b/(2*r))*KpPhiPos;
+      //   }else if(phiError < 0){
+      //     desiredVel[0] += phiError*(b/(2*r))*KpPhiPos;
+      //     desiredVel[1] -= phiError*(b/(2*r))*KpPhiPos;
+      //   }
+      // }
       for (int i = 0; i<2; i++) { // Calculate Porportional controler for each wheel
         pos_error[i] = desiredPos[i] - currentEncoderCountRad[i]; // calculate position error from desired pos
         integralError[i] = integralError[i] + pos_error[i]*((float)(desired_Ts_ms/1000)); // integral error
         desiredVel[i] = Kp_pos*pos_error[i] + Ki_pos * integralError[i]; // calculate desired velocity for each wheel with K values found in simulation
-        error[i] = desiredVel[i] - vel[i];
+        // error[i] = desiredVel[i] - vel[i];
+        if(vel[0] = vel[1] || mode == 0){ //
+          error[i] = desiredVel[i] - vel[i];}
+        else if((vel[0]>vel[1]) && (mode == 1)){
+          error[1] = desiredVel[1] + (vel[0]-vel[1])/2;
+          error[0] = desiredVel[0] - (vel[0]-vel[1])/2;
+        }
+        else if(vel[0]<vel[1] && mode == 1){
+          error[1] = desiredVel[1] - (vel[1]-vel[0])/2;
+          error[0] = desiredVel[0] + (vel[1]-vel[0])/2;
+        }
+
         voltage[i] = Kp * error[i];
         if (voltage[i] >= 0) {
           digitalWrite(MotorSign[i],LOW);
         } else {
           digitalWrite(MotorSign[i], HIGH);   
         }
-
-      //   if(phiError != 0){
-      //     if(phiError > 0 ){
-      //       desiredVel[0] -= phiError*(b/(2*r));
-      //       desiredVel[1] += phiError*(b/(2*r));
-      //     }else if(phiError < 0){
-      //       desiredVel[0] += phiError*(b/(2*r));
-      //       desiredVel[1] -= phiError*(b/(2*r));
-      //     }
-      // }
-
         PWM[i] = 255*abs(voltage[i])/batteryVoltage; //run motors with calculated PID 
         analogWrite(MotorVoltage[i],min(PWM[i],255));
       }
-  phiError = phiNew - desiredPhi;
-  intErrorPhi = intErrorPhi + phiError *((float)(desired_Ts_ms/1000));
-  desiredPhiVel = KpPhiPos*phiError +KiPhiPos*intErrorPhi;
-
   while(millis()<last_time_ms+desired_Ts_ms){
     //wait till desired time passes
   }

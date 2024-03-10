@@ -28,10 +28,10 @@ int initialEncoderCount[2] = {0,0}; //Found in setup to check for change in coun
 float initialEncoderCountRad[2] = {0,0}; //Radian version of initial count
 float vel[2]; //Velocity found from timeelapsed and count/radian change
 float desiredVel[2]={0,0}; //Desired velocity to achieve in radian/second
-float Kp_pos = 20; //Controller gain for proportional 
-float Ki_pos = 0.25; //Controller gain for integrator
+float Kp_pos = 7.95548607436073; //Controller gain for proportional 
+float Ki_pos = 0.5; //Controller gain for integrator
 float Kp = 2.5;
-int voltage[2] = {0,0}; // voltage to be used for speed and position control
+float voltage[2] = {0,0}; // voltage to be used for speed and position control
 float batteryVoltage = 7.8; //Sets saturation point for battery
 //Defines error values for position and integral
 float pos_error[2]= {0,0}; 
@@ -182,9 +182,8 @@ void setup() {
   startTime = millis();
   initialTime = millis();
 
-
   desiredPhi = PI/2;
-  desiredDis = .6096; //M
+  desiredDis = 1.524; //M
 
 }
 
@@ -228,22 +227,22 @@ void loop() {
       Serial.println(currentEncoderCount[1]);
       if(phiNew <= desiredPhi + PI/180 && phiNew >= desiredPhi - PI/180){
         mode = 1;
-        delay(2000);
+        delay(1000);
         PWM[0] = 0;
         PWM[1] = 0;
+        count1 = 0;
+        count2 = 0;
       }
     break;
     case 1:
       desiredPos[0] = desiredDis/(r);
       desiredPos[1] = desiredDis/(r);
       desiredPhi = 0;
-      Serial.print(desiredPos[0]);
+      Serial.print(voltage[0]);
       Serial.print("\t");
-      Serial.print(desiredPos[1]);
-      Serial.print("\t");
-      Serial.print(currentEncoderCountRad[0]);
-      Serial.print("\t");
-      Serial.println(currentEncoderCountRad[1]);
+      Serial.println(voltage[1]);
+
+
       if ((currentEncoderCountRad[0]*r <= desiredDis+0.0254 && currentEncoderCountRad[0]*r >= desiredDis - 0.0254) && (currentEncoderCountRad[1]*r <= desiredDis+0.0254 && currentEncoderCountRad[1]*r >= desiredDis - 0.0254) ) {
         PWM[0] = 0;
         PWM[1] = 0;
@@ -269,8 +268,18 @@ void loop() {
           desiredVel[i] = 5;
         }
       }
-      error[i] = desiredVel[i] - vel[i];
-      voltage[i] = Kp * error[i];
+      // if(vel[0] == vel[1] || mode == 0){ 
+      //   error[i] = desiredVel[i] - vel[i];}
+     error[i] = desiredVel[i] - vel[i];
+     voltage[i] = Kp * error[i];
+      // if((vel[0]>vel[1]) && (mode == 1)){
+      //   voltage[0] = voltage[0] - (voltage[0]-voltage[1])/2;
+      //   voltage[1] = voltage[1] + (voltage[0]-voltage[1])/2;
+      // }
+      // else if((vel[0]<vel[1]) && (mode == 1)){
+      //   voltage[1] = voltage[1] - (voltage[1]-voltage[0])/2;
+      //   voltage[0] = voltage[0] + (voltage[1]-voltage[0])/2;
+      // }
       if (voltage[i] >= 0) {
         digitalWrite(MotorSign[i],LOW);
       } else {

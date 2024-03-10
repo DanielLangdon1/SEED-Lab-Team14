@@ -47,6 +47,7 @@ float b = 0.3556; //m between middles of wheels
 float r = 0.07; //wheel rad m
 float distanceTraveled = 0;
 int mode = 0; ///0 for turn 1 for move
+int count = 0;
 
 float xVel1 = 0;
 float xVel2 = 0;
@@ -228,7 +229,8 @@ void loop() {
       if(phiNew <= desiredPhi + PI/180 && phiNew >= desiredPhi - PI/180){
         mode = 1;
         delay(2000);
-        continue;
+        PWM[0] = 0;
+        PWM[1] = 0;
       }
     break;
     case 1:
@@ -242,12 +244,20 @@ void loop() {
       Serial.print(currentEncoderCountRad[0]);
       Serial.print("\t");
       Serial.println(currentEncoderCountRad[1]);
+      if ((currentEncoderCountRad[0]*r <= desiredDis+0.0254 && currentEncoderCountRad[0]*r >= desiredDis - 0.0254) && (currentEncoderCountRad[1]*r <= desiredDis+0.0254 && currentEncoderCountRad[1]*r >= desiredDis - 0.0254) ) {
+        PWM[0] = 0;
+        PWM[1] = 0;
+      }
     break;
-
     case 3:
+      PWM[0] = 0;
+      PWM[1] = 0;
     break;
   }
-
+  phiError = desiredPhi - phiNew;
+  if (abs(phiError) <= 0.1704 ){
+    
+  }
   for (int i = 0; i<2; i++) { // Calculate Porportional controler for each wheel
       pos_error[i] = desiredPos[i] - currentEncoderCountRad[i]; // calculate position error from desired pos
       integralError[i] = integralError[i] + pos_error[i]*((float)(desired_Ts_ms/1000)); // integral error

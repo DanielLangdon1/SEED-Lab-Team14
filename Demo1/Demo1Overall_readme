@@ -1,0 +1,4 @@
+Names: Tate Morrison, Max Allen, Ian McGrath, and Daniel Langdon
+In the following code bits we constructed a system that can interpret the angle and distance of an Aruco marker based on camera input. We do not send these angles to the arduino yet. The arduino
+takes a desired distance and angle to turn uploads this to the motor to run correctly. To use this code you need a raspberry PI, camera, arduino, motor driver, two motors, 3 wheels and something 
+to construct a mini robot and holder for the arduino and PI. 

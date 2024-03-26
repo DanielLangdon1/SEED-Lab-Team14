@@ -88,6 +88,7 @@ float desiredDis = .3048; //m
 float desiredRot = 1.00*((desiredDis*4)/(2*2*PI*r));
 
 float phi;
+int mode = 1;
 
 int PWM[2] = {0,0}; //PWM variable to be used for later
 
@@ -167,8 +168,8 @@ void setup() {
 
   // Variables for desired angle and distance to travel in radians and meters
   desiredPhi = PI;
-  desiredDis = 50;
-  desiredRot = ((desiredDis)/(2*PI*r))
+  desiredDis = 3;
+  desiredRot = ((desiredDis)/(2*PI*r));
 
 }
 
@@ -176,8 +177,6 @@ void loop() {
   // put your main code here, to run repeatedly:
   // analogWrite(MotorVoltage[0],100);
 
-  while(abs(phi) <= abs(desiredPhi)) {
-    break;
     lastTime = millis();
     //Compute current time
     currentTime = (float)((lastTime-startTime)/1000);
@@ -189,142 +188,82 @@ void loop() {
       currentEncoderCountRad[i] = 2*PI*(float)(currentEncoderCount[i])/3200;
       vel[i] = (currentEncoderCountRad[i]-initialEncoderCountRad[i])/timeElapsed;
     }
+    switch (mode) {
+      case 0:
+        if (desiredPhi >= 0) {
+          desiredRhoVel = 0;
+          desiredPhiVel = 5;
+        } else if (desiredPhi < 0) {
+          desiredRhoVel = 0;
+          desiredPhiVel = -5;
+        }
 
-    if (desiredPhi >= 0) {
-      desiredRhoVel = 0;
-      desiredPhiVel = 5;
-    } else if (desiredPhi < 0) {
-      desiredRhoVel = 0;
-      desiredPhiVel = -5;
+        phiVel = (r/d)*(vel[0]-vel[1]);
+        rhoVel = (r/2)*(vel[0]+vel[1]);
+        errorRhoVel = rhoVel - desiredRhoVel;
+        errorPhiVel = phiVel - desiredPhiVel;
+
+        derivativeRhoVel = (errorRhoVel - errorRhoVelInitial)/(desired_Ts_ms);
+        derivativePhiVel = (errorPhiVel - errorPhiVelInitial)/(desired_Ts_ms);
+
+        integralRhoVel += errorRhoVel*(desired_Ts_ms); // may need to change to *((float)(desired_Ts_ms/1000))
+        integralPhiVel += errorPhiVel*(desired_Ts_ms);
+
+        Vbar = errorRhoVel*KpRhoVel + KdRhoVel*derivativeRhoVel + KiRhoVel*integralRhoVel;
+        deltaV = errorPhiVel*KpPhiVel + KdPhiVel*derivativePhiVel + KiPhiVel*integralPhiVel;
+
+        voltage[0] = (Vbar + deltaV)/2;
+        voltage[1] = (Vbar - deltaV)/2;
+
+        for(int i = 0; i < 2; i++) {
+          PWM[i] = 255*abs(voltage[i])/batteryVoltage;
+          if(voltage[i] >= 0) {
+            digitalWrite(MotorSign[i],LOW);
+            analogWrite(MotorVoltage[0],min(PWM[i],255));
+          } else {
+            digitalWrite(MotorSign[i],HIGH);
+            analogWrite(MotorVoltage[0],-1*min(PWM[i],255));
+          }
+        } 
+        phi = (r/d) * (currentEncoderCountRad[0]-currentEncoderCountRad[1]);
+      break;
+      case 1:
+        rotations = Rho/(2*PI*r);
+        errorRho = desiredRho - Rho;
+        derivativeRho = (errorRho - errorRhoInitial)/((float)(desired_Ts_ms/1000));
+        integralRho = integralRho + errorRho*((float)(desired_Ts_ms/1000));
+
+        desiredRhoVel = errorRho*Kp + Kd*derivativeRho + Ki*integralRho;
+        desiredPhiVel = 0;
+
+        phiVel = (r/d)*(vel[0]-vel[1]);
+        rhoVel = (r/2)*(vel[0]+vel[1]);
+        errorRhoVel = rhoVel - desiredRhoVel;
+        errorPhiVel = phiVel - desiredPhiVel;
+
+        derivativeRhoVel = (errorRhoVel - errorRhoVelInitial)/((desired_Ts_ms));
+        derivativePhiVel = (errorPhiVel - errorPhiVelInitial)/(desired_Ts_ms);
+
+        integralRhoVel += errorRhoVel*(desired_Ts_ms);
+        integralPhiVel += errorPhiVel*(desired_Ts_ms);
+
+        Vbar = errorRhoVel*KpRhoVel + KdRhoVel*derivativeRhoVel + KiRhoVel*integralRhoVel;
+        deltaV = errorPhiVel*KpPhiVel + KdPhiVel*derivativePhiVel + KiPhiVel*integralPhiVel;
+        voltage[0] = (Vbar+deltaV)/2;
+        voltage[1] = (Vbar - deltaV)/2;
+
+        for(int i = 0; i < 2; i++) {
+          PWM[i] = 255*abs(voltage[i])/batteryVoltage;
+          if(voltage[i] >= 0) {
+            digitalWrite(MotorSign[i],HIGH);
+            analogWrite(MotorVoltage[i],min(PWM[i],200));
+          } else {
+            digitalWrite(MotorSign[i],LOW);
+            analogWrite(MotorVoltage[i],min(PWM[i],200));
+          }
+        }
+      break;
     }
-
-    phiVel = (r/d)*(vel[0]-vel[1]);
-    rhoVel = (r/2)*(vel[0]+vel[1]);
-    errorRhoVel = rhoVel - desiredRhoVel;
-    errorPhiVel = phiVel - desiredPhiVel;
-
-    derivativeRhoVel = (errorRhoVel - errorRhoVelInitial)/(desired_Ts_ms);
-    derivativePhiVel = (errorPhiVel - errorPhiVelInitial)/(desired_Ts_ms);
-
-    integralRhoVel += errorRhoVel*(desired_Ts_ms); // may need to change to *((float)(desired_Ts_ms/1000))
-    integralPhiVel += errorPhiVel*(desired_Ts_ms);
-
-    Vbar = errorRhoVel*KpRhoVel + KdRhoVel*derivativeRhoVel + KiRhoVel*integralRhoVel;
-    deltaV = errorPhiVel*KpPhiVel + KdPhiVel*derivativePhiVel + KiPhiVel*integralPhiVel;
-
-    voltage[0] = (Vbar + deltaV)/2;
-    voltage[1] = (Vbar - deltaV)/2;
-
-
-    Serial.print(integralPhiVel);
-    Serial.print("\t");
-    Serial.println(errorPhiVel);
-
-
-    for(int i = 0; i < 2; i++) {
-      PWM[i] = 255*abs(voltage[i])/batteryVoltage;
-      if(voltage[i] >= 0) {
-        digitalWrite(MotorSign[i],LOW);
-        analogWrite(MotorVoltage[0],min(PWM[i],255));
-      } else {
-        digitalWrite(MotorSign[i],HIGH);
-        analogWrite(MotorVoltage[0],-1*min(PWM[i],255));
-      }
-    }
-    phi = (r/d) * (currentEncoderCountRad[0]-currentEncoderCountRad[1]);
-    //Sets old values to new values
-    errorRhoVelInitial = errorRhoVel;
-    errorPhiVelInitial = errorPhiVelInitial;
-    for(int i = 0;i<2;i++){ 
-      initialEncoderCount[i] = currentEncoderCount[i];
-      initialEncoderCountRad[i] = currentEncoderCountRad[i];
-    }
-    initialTime = millis();
-
-    while(millis()<last_time_ms+desired_Ts_ms){
-      //wait till desired time passes
-    }
-    last_time_ms=millis();
-  }
-  Serial.println("post while loop");
-
-  //Stops motors and delays for a second before driving forward;
-  for (int i = 0; i < 2; i++) {
-    analogWrite(MotorVoltage[i], 0);
-  }
-  delay(1000);
-
-
-  while(rotations <= desiredRot) {
-      lastTime = millis();
-    //Compute current time
-    currentTime = (float)((lastTime-startTime)/1000);
-    timeElapsed = (float)(currentTime-initialTime)/1000;
-    currentEncoderCount[0] = MyEnc1();
-    currentEncoderCount[1] = MyEnc2();
-   for(int i = 0;i<2;i++){ // set encoders to radians and finds velocity
-      currentEncoderCountRad[i] = 2*PI*(float)(currentEncoderCount[i])/3200;
-      vel[i] = (currentEncoderCountRad[i]-initialEncoderCountRad[i])/timeElapsed;
-    }
-    Rho = (r/2)*(currentEncoderCountRad[0]+currentEncoderCountRad[1]);
-    rotations = Rho/(2*PI*r);
-    errorRho = desiredRho - Rho;
-    derivativeRho = (errorRho - errorRhoInitial)/((float)(desired_Ts_ms/1000));
-    integralRho = integralRho + errorRho*((float)(desired_Ts_ms/1000));
-
-    desiredRhoVel = errorRho*Kp + Kd*derivativeRho + Ki*integralRho;
-    desiredPhiVel = 0;
-
-    phiVel = (r/d)*(vel[0]-vel[1]);
-    rhoVel = (r/2)*(vel[0]+vel[1]);
-    errorRhoVel = rhoVel - desiredRhoVel;
-    errorPhiVel = phiVel - desiredPhiVel;
-
-    derivativeRhoVel = (errorRhoVel - errorRhoVelInitial)/((desired_Ts_ms));
-    derivativePhiVel = (errorPhiVel - errorPhiVelInitial)/(desired_Ts_ms);
-
-    integralRhoVel += errorRhoVel*(desired_Ts_ms);
-    integralPhiVel += errorPhiVel*(desired_Ts_ms);
-
-    Vbar = errorRhoVel*KpRhoVel + KdRhoVel*derivativeRhoVel + KiRhoVel*integralRhoVel;
-    deltaV = errorPhiVel*KpPhiVel + KdPhiVel*derivativePhiVel + KiPhiVel*integralPhiVel;
-
-    // if (abs(Vbar) > 25 ){
-    //   Vbar = 25;
-    //   errorRhoVel = errorRhoVel*min(Vbar/KpRhoVel , abs(errorRhoVel));
-    //   integralRhoVel = (Vbar - KpRhoVel*errorRhoVel - KdRhoVel*derivativeRhoVel)/ KiRhoVel; 
-    // }
-    // if (abs(deltaV) < -25 ){
-    //   deltaV = -25;
-    // }
-
-    Serial.print(currentEncoderCountRad[1]);
-    Serial.print("\t");
-    Serial.print(currentEncoderCountRad[0]);
-    Serial.print("\t");
-    Serial.print(vel[0]);
-    Serial.print("\t");
-    Serial.print(vel[1]);
-    Serial.print("\t");
-    Serial.print(deltaV);
-    Serial.print("\t");
-    Serial.println(phi);
-
-
-    voltage[0] = (Vbar+deltaV)/2;
-    voltage[1] = (Vbar - deltaV)/2;
-
-    for(int i = 0; i < 2; i++) {
-      PWM[i] = 255*abs(voltage[i])/batteryVoltage;
-      if(voltage[i] >= 0) {
-        digitalWrite(MotorSign[i],HIGH);
-        analogWrite(MotorVoltage[i],min(PWM[i],200));
-      } else {
-        digitalWrite(MotorSign[i],LOW);
-        analogWrite(MotorVoltage[i],min(PWM[i],200));
-      }
-    }
-
     //Sets old values to new values
     errorRhoVelInitial = errorRhoVel;
     errorPhiVelInitial = errorPhiVelInitial;
@@ -340,17 +279,3 @@ void loop() {
     }
     last_time_ms=millis();
   }
-
-
-  //Stops motors and delays for a second before driving forward;
-  for (int i = 0; i < 2; i++) {
-    analogWrite(MotorVoltage[i], 0);
-  }
-  delay(50000);
-  
-
-  while(millis()<last_time_ms+desired_Ts_ms){
-    //wait till desired time passes
-  }
-  last_time_ms=millis();
-}

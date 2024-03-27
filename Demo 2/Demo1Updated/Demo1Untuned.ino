@@ -38,23 +38,16 @@ float lastTime; //Used to compute current time
 float currentTime; //Initializes current time for loop
 float timeElapsed;
 
+
 int count1 = 0; //Initializes encoder counts for the ISR
 int count2 = 0; //Initializes encoder counts for the second encoder ISR
 unsigned long int currentEncoderCount[2] = {0,0}; //Intilization for Encoder Counts to be used in loop 
 float currentEncoderCountRad[2] = {0,0}; //Converted counts to radian for velocity in rad
 int initialEncoderCount[2] = {0,0}; //Found in setup to check for change in counts
 float initialEncoderCountRad[2] = {0,0}; //Radian version of initial count
-float vel[2]; //Velocity found from timeelapsed and count/radian change;
+float vel[2] = {0,0}; //Velocity found from timeelapsed and count/radian change;
 float voltage[2] = {0,0}; // voltage to be used for speed and position control
 float batteryVoltage = 7.8; //Sets saturation point for battery
-
-//Instantiates gain values for PID velocity controller
-float KiRhoVel = .25; 
-float KiPhiVel = .25; 
-float KdRhoVel = .03;
-float KdPhiVel = .03;
-float KpRhoVel = 3;
-float KpPhiVel = 3;
 
 // Instantiates all variables for the velocity controller
 float phiVel = 0;
@@ -73,20 +66,36 @@ float desiredRhoVel = 0;
 float desiredPhiVel = 0;
 
 // Instantiates all variables for position controller
-float Ki = 0.1;
-float Kd = 0.1;
-float Kp = 5;
-float desiredRho = 50;
-float Rho;
-float errorRho;
-float errorRhoInitial;
-float derivativeRho;
-float integralRho;
-float desiredPhi = PI;
-float rotations = 0;
-float desiredDis = .3048; //m
-float desiredRot = 1.00*((desiredDis*4)/(2*2*PI*r));
+float KiPhi = 0.74;
+float KdPhi = .389;
+float KpPhi = 7.02;
 
+float KiRho = 9.33;
+float KdRho = .1935;
+float KpRho = 7.657;
+//Instantiates gain values for PID velocity controller
+
+float KiRhoVel = 0; 
+float KiPhiVel = 0; 
+float KdRhoVel = 0;
+float KdPhiVel = 0;
+float KpRhoVel = 4;
+float KpPhiVel = .213;
+
+// float desiredRho = 50;
+float Rho = 0;
+float errorRho = 0;
+float errorRhoInitial = 0;
+float errorPhiInitial = 0;
+float derivativeRho = 0;
+float integralRho = 0;
+float desiredPhi = 0;
+float rotations = 0;
+float desiredRho = .3048; //m
+float desiredRot = 1.00*((desiredRho*4)/(2*2*PI*r));
+float errorPhi = 0;
+float derivativePhi = 0;
+float integralPhi = 0;
 float phi;
 int mode = 1;
 
@@ -168,8 +177,9 @@ void setup() {
 
   // Variables for desired angle and distance to travel in radians and meters
   desiredPhi = PI;
-  desiredDis = 3;
-  desiredRot = ((desiredDis)/(2*PI*r));
+  desiredRho = 2;
+  desiredRot = ((desiredRho)/(2*PI*r));
+
 
 }
 
@@ -180,14 +190,19 @@ void loop() {
     lastTime = millis();
     //Compute current time
     currentTime = (float)((lastTime-startTime)/1000);
-    timeElapsed = (float)(currentTime-initialTime)/1000;
+    timeElapsed = (float)(millis()-initialTime)/1000;
     currentEncoderCount[0] = MyEnc1();
     currentEncoderCount[1] = MyEnc2();
 
     for(int i = 0;i<2;i++){ // set encoders to radians and finds velocity
       currentEncoderCountRad[i] = 2*PI*(float)(currentEncoderCount[i])/3200;
-      vel[i] = (currentEncoderCountRad[i]-initialEncoderCountRad[i])/timeElapsed;
+      if(timeElapsed > 0 ){
+        vel[i] = (currentEncoderCountRad[i]-initialEncoderCountRad[i])/timeElapsed;}
     }
+    Rho = (r/2)*(currentEncoderCountRad[0]+currentEncoderCountRad[1]);
+
+
+
     switch (mode) {
       case 0:
         if (desiredPhi >= 0) {
@@ -228,27 +243,48 @@ void loop() {
         phi = (r/d) * (currentEncoderCountRad[0]-currentEncoderCountRad[1]);
       break;
       case 1:
+        desiredPhi = 0;
+        errorPhi = desiredPhi - phi;
+        derivativePhi = (errorPhi - errorPhiInitial)/((float)(desired_Ts_ms));
+        integralPhi = integralPhi + errorPhi*desired_Ts_ms;
+        desiredPhiVel = errorPhi*KpPhi + KdPhi*derivativePhi + KiPhi*integralPhi;
+        
         rotations = Rho/(2*PI*r);
         errorRho = desiredRho - Rho;
-        derivativeRho = (errorRho - errorRhoInitial)/((float)(desired_Ts_ms/1000));
-        integralRho = integralRho + errorRho*((float)(desired_Ts_ms/1000));
+        derivativeRho = (errorRho - errorRhoInitial)/((float)(desired_Ts_ms));
+        integralRho = integralRho + errorRho*desired_Ts_ms;
 
-        desiredRhoVel = errorRho*Kp + Kd*derivativeRho + Ki*integralRho;
-        desiredPhiVel = 0;
+        desiredRhoVel = errorRho*KpRho + KdRho*derivativeRho + KiRho*integralRho;
+
 
         phiVel = (r/d)*(vel[0]-vel[1]);
         rhoVel = (r/2)*(vel[0]+vel[1]);
         errorRhoVel = rhoVel - desiredRhoVel;
         errorPhiVel = phiVel - desiredPhiVel;
 
-        derivativeRhoVel = (errorRhoVel - errorRhoVelInitial)/((desired_Ts_ms));
-        derivativePhiVel = (errorPhiVel - errorPhiVelInitial)/(desired_Ts_ms);
+        // derivativeRhoVel = (errorRhoVel - errorRhoVelInitial)/((float)(desired_Ts_ms));
+        // derivativePhiVel = (errorPhiVel - errorPhiVelInitial)/((float)(desired_Ts_ms));
+        Serial.print(errorRhoVel);
+        Serial.print("\t");
+        Serial.print(desiredRho);
+        Serial.print("\t");
+        Serial.print(vel[0]);
+        Serial.print("\t");
+        Serial.print(vel[1]);
+        Serial.print("\t");
+        Serial.print(integralRho);
+        Serial.print("\t");
+        Serial.print(rhoVel);
+        Serial.print("\t");
+        Serial.print(derivativeRho);
+        Serial.print("\t");
+        Serial.println(errorRho);
+        // integralRhoVel += errorRhoVel*((float)(desired_Ts_ms));
+        // integralPhiVel += errorPhiVel*((float)(desired_Ts_ms));
 
-        integralRhoVel += errorRhoVel*(desired_Ts_ms);
-        integralPhiVel += errorPhiVel*(desired_Ts_ms);
+        Vbar = errorRhoVel*KpRhoVel;
+        deltaV = errorPhiVel*KpPhiVel;
 
-        Vbar = errorRhoVel*KpRhoVel + KdRhoVel*derivativeRhoVel + KiRhoVel*integralRhoVel;
-        deltaV = errorPhiVel*KpPhiVel + KdPhiVel*derivativePhiVel + KiPhiVel*integralPhiVel;
         voltage[0] = (Vbar+deltaV)/2;
         voltage[1] = (Vbar - deltaV)/2;
 
@@ -264,10 +300,12 @@ void loop() {
         }
       break;
     }
+
     //Sets old values to new values
     errorRhoVelInitial = errorRhoVel;
     errorPhiVelInitial = errorPhiVelInitial;
     errorRhoInitial = errorRho;
+    errorPhiInitial = errorPhi;
     for(int i = 0;i<2;i++){ 
       initialEncoderCount[i] = currentEncoderCount[i];
       initialEncoderCountRad[i] = currentEncoderCountRad[i];
@@ -277,5 +315,6 @@ void loop() {
     while(millis()<last_time_ms+desired_Ts_ms){
       //wait till desired time passes
     }
-    last_time_ms=millis();
+    last_time_ms = millis();
+
   }

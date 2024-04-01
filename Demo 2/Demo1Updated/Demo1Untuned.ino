@@ -41,7 +41,7 @@ float timeElapsed;
 
 int count1 = 0; //Initializes encoder counts for the ISR
 int count2 = 0; //Initializes encoder counts for the second encoder ISR
-unsigned long int currentEncoderCount[2] = {0,0}; //Intilization for Encoder Counts to be used in loop 
+int currentEncoderCount[2] = {0,0}; //Intilization for Encoder Counts to be used in loop 
 float currentEncoderCountRad[2] = {0,0}; //Converted counts to radian for velocity in rad
 int initialEncoderCount[2] = {0,0}; //Found in setup to check for change in counts
 float initialEncoderCountRad[2] = {0,0}; //Radian version of initial count
@@ -66,17 +66,17 @@ float desiredRhoVel = 0;
 float desiredPhiVel = 0;
 
 // Instantiates all variables for position controller
-float KiPhi = 345199.84;
-float KdPhi = 4767.71;
-float KpPhi = 81137.26;
+float KiPhi = 0.45;
+float KdPhi = 0;
+float KpPhi = 45;
 
-float KiRho = 0.383;
+float KiRho = .383;
 float KdRho = .2038;
 float KpRho = 2.3514;
 //Instantiates gain values for PID velocity controller
 
-float KpRhoVel = 3.267;
-float KpPhiVel = 0.0026;
+float KpRhoVel = 100;
+float KpPhiVel = 20;
 // float desiredRho = 50;
 float Rho = 0;
 float errorRho = 0;
@@ -91,7 +91,7 @@ float errorPhi = 0;
 float derivativePhi = 0;
 float integralPhi = 0;
 float phi = 0;
-int mode = 1;
+int mode = 0;
 
 int PWM[2] = {0,0}; //PWM variable to be used for later
 
@@ -170,8 +170,8 @@ void setup() {
   initialTime = millis();
 
   // Variables for desired angle and distance to travel in radians and meters
-  desiredPhi = PI;
-  desiredRho = 0.25;
+  desiredPhi = PI/2-PI/180;
+  desiredRho = 0.3;
 }
 
 void loop() {
@@ -207,16 +207,16 @@ void loop() {
           desiredPhiVel = -5;
         }
         desiredRho = 0;
-        if (abs(phi) >= abs(desiredPhi)) {
-          mode = 3;
+        if (phi <= desiredPhi + PI/180 && phi >= desiredPhi-PI/180) {
+          mode = 1;
         }
       break;
       case 1:
-        desiredRho = 0.25;
-        desiredPhi = 0;
-        /*if(abs(Rho) >= (desiredRho)) {
+        desiredRho = 0.3;
+        //desiredPhi = 0;
+        if(abs(Rho) == (desiredRho)) {
           mode = 3;
-        }*/
+        }
       break;
       case 3:
         desiredPhi = 0;
@@ -228,22 +228,21 @@ void loop() {
   //Serial.println(mode);
   if(mode == 1 || mode == 0) {
     errorPhi = desiredPhi - phi;
-    derivativePhi = (errorPhi - errorPhiInitial)/((float)(desired_Ts_ms));
-    integralPhi = integralPhi + errorPhi*desired_Ts_ms;
+    derivativePhi = (errorPhi - errorPhiInitial)/((float)(desired_Ts_ms/1000));
+    integralPhi = integralPhi + errorPhi*((float)(desired_Ts_ms/1000));
     desiredPhiVel = errorPhi*KpPhi + KdPhi*derivativePhi + KiPhi*integralPhi;
     if(abs(desiredPhiVel) > 10){
       desiredPhiVel = 10 *desiredPhiVel/abs(desiredPhiVel);
     }
 
-    
     errorRho = desiredRho - Rho;
-    derivativeRho = (errorRho - errorRhoInitial)/((float)(desired_Ts_ms));
-    integralRho = integralRho + errorRho*desired_Ts_ms;
+    derivativeRho = (errorRho - errorRhoInitial)/((float)(desired_Ts_ms/1000));
+    integralRho = integralRho + errorRho*((float)(desired_Ts_ms/1000));
     desiredRhoVel = errorRho*KpRho + KdRho*derivativeRho + KiRho*integralRho;
 
-    if(abs(desiredRhoVel) > 10){
+    /*if(abs(desiredRhoVel) > 10){
         desiredRhoVel = 10 *desiredRhoVel/abs(desiredRhoVel);
-    }
+    }*/
 
     phiVel = (r/d)*(vel[0]-vel[1]);
     rhoVel = (r/2)*(vel[0]+vel[1]);
@@ -254,14 +253,14 @@ void loop() {
     // Serial.print(currentEncoderCountRad[0]);
     // Serial.print("\t");
     // Serial.print(currentEncoderCountRad[1]);
-    // Serial.print("\t");
+    // Serial.println("\t");
+    Serial.print(Rho);
+    Serial.print("\t");
+    Serial.print(desiredRho);
+    Serial.print("\t");
     Serial.print(phi);
     Serial.print("\t");
-    Serial.print(errorRhoVel);
-    Serial.print("\t");
-    Serial.print(errorPhiVel);
-    Serial.print("\t");
-    Serial.print(voltage[0]);
+    Serial.print(desiredPhi);
     Serial.print("\t");
     Serial.println(voltage[1]);
     // Serial.print("\t");
@@ -277,17 +276,21 @@ void loop() {
 
     Vbar = errorRhoVel*KpRhoVel;
     deltaV = errorPhiVel*KpPhiVel;
-    voltage[1] = (Vbar+deltaV)/2;
-    voltage[0] = (Vbar - deltaV)/2;
+
+    voltage[0] = (Vbar+deltaV)/2;
+    voltage[1] = (Vbar - deltaV)/2;
+    if (mode == 0) {
+      voltage[0] = abs(voltage[0])*-1;
+    }
 
     for(int i = 0; i < 2; i++) {
-      PWM[i] = 255*abs(voltage[i])/batteryVoltage;
+      //PWM[i] = 255*abs(voltage[i])/batteryVoltage;
       if(voltage[i] >= 0) {
         digitalWrite(MotorSign[i],HIGH);
-        analogWrite(MotorVoltage[i],min(PWM[i],200));
+        analogWrite(MotorVoltage[i],abs(voltage[i]));
       } else {
           digitalWrite(MotorSign[i],LOW);
-          analogWrite(MotorVoltage[i],min(PWM[i],200));
+          analogWrite(MotorVoltage[i],abs(voltage[i]));
         }
     }
   }

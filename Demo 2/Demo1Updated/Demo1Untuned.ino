@@ -92,8 +92,7 @@ float derivativePhi = 0;
 float integralPhi = 0;
 float phi = 0;
 int mode = 0;
-
-int PWM[2] = {0,0}; //PWM variable to be used for later
+int lastMode;
 
 //ISR to check for a change in state of the encoder
 void myISR1() {
@@ -206,23 +205,46 @@ void loop() {
           desiredRhoVel = 0;
           desiredPhiVel = -5;
         }
-        desiredRho = 0;
         if (phi <= desiredPhi + PI/180 && phi >= desiredPhi-PI/180) {
-          mode = 1;
+          if(lastMode == 1){
+            lastMode = mode;
+            mode = 4;
+          }
+          else if(lastMode == 2){
+            lastMode = mode;
+            mode = 1;
+            desiredRho = 0.25;
+            }
         }
       break;
       case 1:
         desiredRho = 0.3;
         //desiredPhi = 0;
-        if(abs(Rho) == (desiredRho)) {
-          mode = 3;
-        }
+        if(abs(Rho) <= (desiredRho)+.01 && abs(Rho) >= (desiredRho)-.01) {
+          lastMode = mode;
+          mode = 0;
+          desiredPhi = PI/2;        }
       break;
+      case 2:
+        desiredPhiVel = 10;
+        desiredRhoVel = 0;
+        if (currentTime > 5){
+          lastMode = mode;
+          mode = 0;
+          desiredPhi = PI/8;
+          count1 = 0;
+          count2 = 0;
+        }
+        break;
       case 3:
         desiredPhi = 0;
         //desiredRho = 0;
         analogWrite(MotorVoltage[0], 0);
         analogWrite(MotorVoltage[1], 0);
+      case 4:
+        desiredPhiVel = 5;
+        desiredRhoVel = 5;
+        break;
     }
 
   //Serial.println(mode);
@@ -261,12 +283,14 @@ void loop() {
     Serial.print(phi);
     Serial.print("\t");
     Serial.print(desiredPhi);
+    Serial.print("\t mode: ");
+    Serial.print(mode);
+    Serial.print("\t last mode: ");
+    Serial.print(lastMode);
+    Serial.print("\t voltage: ");
+    Serial.print(voltage[0]);
     Serial.print("\t");
     Serial.println(voltage[1]);
-    // Serial.print("\t");
-    // Serial.print(vel[1]);
-    // Serial.print("\t");
-    // Serial.print(integralRho);
     // Serial.print("\t");
     // Serial.print(rhoVel);
     // Serial.print("\t");

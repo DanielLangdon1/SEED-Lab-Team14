@@ -17,6 +17,14 @@ desiredPhi and desiredDis in radians and meters respectively and if you connect 
 #define MY_ADDR 8
 #define PI 3.14159265358979323 // Defines irrational number PI for mathematical use later
 
+volatile uint8_t offset = 0;
+volatile uint8_t instruction[32] = {0};
+volatile uint8_t msgLength = 0;
+volatile uint8_t distanceBit = 0;
+volatile uint8_t angleBit = 0;
+volatile bool detection_flag = false;
+volatile bool circle_flag = false;
+
 // These lines define the pins each motor and encoder pins go to 
 const int MotorVoltage[2] = {10,9}; 
 const int MotorSign[2] = {8,7};
@@ -92,8 +100,10 @@ float derivativePhi = 0;
 float integralPhi = 0;
 float phi = 0;
 int mode = 2;
-int lastMode = 1;
+int lastMode = 2;
 float startCircleTime;
+int freq = 1;
+float stutter;
 
 
 
@@ -168,6 +178,11 @@ void setup() {
   // We want to control the built-in LED (pin 13)
   pinMode(LED_BUILTIN, OUTPUT);
 
+  // Initialize I2C
+  Wire.begin(MY_ADDR);
+  // Set callbacks for I2C interrupts
+  Wire.onReceive(receive);
+
   startTime = millis();
   initialTime = millis();
 
@@ -179,6 +194,15 @@ void setup() {
 void loop() {
   // put your main code here, to run repeatedly:
   // analogWrite(MotorVoltage[0],100);
+
+    // If there is data on the buffer, read it
+  if (msgLength > 0) {
+    if (offset==1) {
+      digitalWrite(LED_BUILTIN,instruction[0]);
+    }
+    printReceived();
+    msgLength = 0;
+  }
 
     lastTime = millis();
     //Compute current time
@@ -219,46 +243,60 @@ void loop() {
           else if(lastMode == 2){
             lastMode = mode;
             mode = 1;
-            desiredRho = 2.5;
             
             }
         }
       break;
       case 1:
-        desiredRho = 2.5;
+        //desiredRho = 2.5;
         //desiredPhi = 0;
-        if(abs(Rho) >= (desiredRho)) {//reached marker
+        if(abs(Rho) >= (desiredRho) || circle_flag == true) {//reached marker
           Serial.print("reached desired Rho");
-          // lastMode = mode; 
-          // mode = 0; //turn 90deg
-          // desiredPhi = PI/2;        
+          lastMode = mode; 
+          mode = 0; //turn 90deg
+          desiredPhi = PI/2;        
           }
       break;
       case 2: //spin while waiting
-        desiredPhiVel = 5;
-        desiredRhoVel = 0;
-        if (currentTime > 5){
+        if (currentTime  < 2){
+          desiredPhiVel = 4;
+          desiredRho = 0;
+          }
+        else {
+          stutter = currentTime;
+          lastMode = mode;
+          desiredPhiVel = 0;
+          desiredRhoVel = 0;
+          mode = 3;
+        }
+        
+        
+        if (detection_flag == true){
           Serial.print("Found marker");
           desiredPhiVel = 0;
           desiredRhoVel = 0;
           lastMode = mode;
           mode = 0;
-          desiredPhi = -PI;
           count1 = 0;
           count2 = 0;
           delay(500);
         }
+        //delay(1000);
         break;
       case 3: //wait
         Serial.print("waiting...");
         desiredPhiVel = 0;
         desiredRhoVel = 0;
+        if(lastMode == 2 && (currentTime - stutter > 5)){
+          lastMode = 3;
+          mode = 2;
+        }
         // analogWrite(MotorVoltage[0], 0);
         // analogWrite(MotorVoltage[1], 0);
       case 4:
         Serial.print("tracing... ");
         desiredRhoVel = 5;
-        desiredPhiVel = desiredRhoVel/(.3048*4);
+        desiredPhiVel = desiredRhoVel/(.3048*2);
         if (startCircleTime-currentTime >= 7) {
           desiredRhoVel = 0;
           desiredPhiVel = 0;
@@ -273,7 +311,7 @@ void loop() {
     }
 
   //Serial.println(mode);
-  if(mode == 1 || mode == 0) {
+  if(mode == 1 || mode == 0 || mode == 2) {
     errorPhi = desiredPhi - phi;
     derivativePhi = (errorPhi - errorPhiInitial)/((float)(desired_Ts_ms/1000));
     integralPhi = integralPhi + errorPhi*((float)(desired_Ts_ms/1000));
@@ -349,6 +387,7 @@ void loop() {
     errorPhiVelInitial = errorPhiVelInitial;
     errorRhoInitial = errorRho;
     errorPhiInitial = errorPhi;
+    freq++;
     for(int i = 0;i<2;i++){ 
       initialEncoderCount[i] = currentEncoderCount[i];
       initialEncoderCountRad[i] = currentEncoderCountRad[i];
@@ -361,3 +400,112 @@ void loop() {
     last_time_ms = millis();
 
   }
+
+  // printReceived helps us see what data we are getting from the leader
+void printReceived() {
+  detection_flag = true;
+  Serial.print("Message: ");
+  for (int i=0;i<msgLength;i++) {
+    Serial.print(String((char) instruction[i]));
+  }
+  Serial.println(""); 
+
+  // Pulling info from our Pi encoding
+  distanceBit =  instruction[0] - 48;
+  angleBit = instruction[1] - 48;
+
+  Serial.print("Distance bit: ");
+  Serial.print(distanceBit);
+  Serial.println("");
+
+  Serial.print("Angle bit: ");
+  Serial.print(angleBit);
+  Serial.println("");
+
+  // Decoding the bits to an average distance / angle
+  // DISTANCE
+  if (distanceBit == 1) {
+    desiredRho = 1;
+  } else if (distanceBit == 2) {
+    desiredRho = 0.875;
+  } else if (distanceBit == 3) {
+    desiredRho = 0.625;
+  } else if (distanceBit == 4) {
+    desiredRho = 0.425;
+  } else if (distanceBit == 5) {
+    desiredRho = 0.30;
+  } else if (distanceBit == 6) {
+    desiredRho = 0.20;
+  } else if (distanceBit == 7) {
+    desiredRho = 0.125;
+  } else if (distanceBit == 8) {
+    desiredRho = 0.65;
+  } else if (distanceBit == 9) {
+    desiredRho = 0.00;
+    circle_flag = true;
+  }
+
+  Serial.print("Distance: ");
+  Serial.print(desiredRho);
+  Serial.println("");
+
+  // ANGLE
+  if (circle_flag == true) {
+    // do nothing
+  }
+  else if (angleBit == 1) {
+    desiredPhi = -22.5;
+    desiredPhi = desiredPhi * 0.0174533;
+
+  } else if (angleBit == 2) {
+    desiredPhi = -15;
+    desiredPhi = desiredPhi * 0.0174533;
+
+  } else if (angleBit == 3) {
+    desiredPhi = -7.5;
+    desiredPhi = desiredPhi * 0.0174533;
+
+  } else if (angleBit == 4) {
+    desiredPhi = -3.5;
+    desiredPhi = desiredPhi * 0.0174533;
+
+  } else if (angleBit == 5) {
+    desiredPhi = 0;
+    desiredPhi = desiredPhi * 0.0174533;
+
+  } else if (angleBit == 6) {
+    desiredPhi = 3.5;
+    desiredPhi = desiredPhi * 0.0174533;
+
+  } else if (angleBit == 7) {
+    desiredPhi = 7.5;
+    desiredPhi = desiredPhi * 0.0174533;
+
+  } else if (angleBit == 8) {
+    desiredPhi = 15;
+    desiredPhi = desiredPhi * 0.0174533;
+
+  } else if (angleBit == 9) {
+    desiredPhi = 22.5;
+    desiredPhi = desiredPhi * 0.0174533;
+  }
+
+
+  Serial.print("Angle: ");
+  Serial.print(desiredPhi);
+  Serial.println("");
+
+}
+
+
+// function called when an I2C interrupt event happens
+void receive() {
+  // Set the offset, this will always be the first byte.
+  offset = Wire.read();
+  // If there is information after the offset, it is telling us more about the command.
+  while (Wire.available()) {
+    instruction[msgLength] = Wire.read();
+    msgLength++;
+    
+  }
+}

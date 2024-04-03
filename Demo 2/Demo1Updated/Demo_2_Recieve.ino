@@ -100,6 +100,8 @@ void printReceived() {
     angle = 22.5;
   }
 
+  angle = angle * 0.0174533;
+
   Serial.print("Angle: ");
   Serial.print(angle);
   Serial.println("");

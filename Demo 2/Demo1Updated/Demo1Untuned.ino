@@ -91,8 +91,11 @@ float errorPhi = 0;
 float derivativePhi = 0;
 float integralPhi = 0;
 float phi = 0;
-int mode = 0;
-int lastMode;
+int mode = 2;
+int lastMode = 1;
+float startCircleTime;
+
+
 
 //ISR to check for a change in state of the encoder
 void myISR1() {
@@ -169,8 +172,8 @@ void setup() {
   initialTime = millis();
 
   // Variables for desired angle and distance to travel in radians and meters
-  desiredPhi = PI/2-PI/180;
-  desiredRho = 0.3;
+  desiredPhi = PI/2;
+  // desiredRho = 0.3;
 }
 
 void loop() {
@@ -206,44 +209,66 @@ void loop() {
           desiredPhiVel = -5;
         }
         if (phi <= desiredPhi + PI/180 && phi >= desiredPhi-PI/180) {
+          Serial.print("reached desired phi");
           if(lastMode == 1){
             lastMode = mode;
             mode = 4;
+            startCircleTime = currentTime;
+
           }
           else if(lastMode == 2){
             lastMode = mode;
             mode = 1;
-            desiredRho = 0.25;
+            desiredRho = 2.5;
+            
             }
         }
       break;
       case 1:
-        desiredRho = 0.3;
+        desiredRho = 2.5;
         //desiredPhi = 0;
-        if(abs(Rho) <= (desiredRho)+.01 && abs(Rho) >= (desiredRho)-.01) {
-          lastMode = mode;
-          mode = 0;
-          desiredPhi = PI/2;        }
+        if(abs(Rho) >= (desiredRho)) {//reached marker
+          Serial.print("reached desired Rho");
+          // lastMode = mode; 
+          // mode = 0; //turn 90deg
+          // desiredPhi = PI/2;        
+          }
       break;
-      case 2:
-        desiredPhiVel = 10;
+      case 2: //spin while waiting
+        desiredPhiVel = 5;
         desiredRhoVel = 0;
         if (currentTime > 5){
+          Serial.print("Found marker");
+          desiredPhiVel = 0;
+          desiredRhoVel = 0;
           lastMode = mode;
           mode = 0;
-          desiredPhi = PI/8;
+          desiredPhi = -PI;
           count1 = 0;
           count2 = 0;
+          delay(500);
         }
         break;
-      case 3:
-        desiredPhi = 0;
-        //desiredRho = 0;
-        analogWrite(MotorVoltage[0], 0);
-        analogWrite(MotorVoltage[1], 0);
+      case 3: //wait
+        Serial.print("waiting...");
+        desiredPhiVel = 0;
+        desiredRhoVel = 0;
+        // analogWrite(MotorVoltage[0], 0);
+        // analogWrite(MotorVoltage[1], 0);
       case 4:
-        desiredPhiVel = 5;
+        Serial.print("tracing... ");
         desiredRhoVel = 5;
+        desiredPhiVel = desiredRhoVel/(.3048*4);
+        if (startCircleTime-currentTime >= 7) {
+          desiredRhoVel = 0;
+          desiredPhiVel = 0;
+          mode = 3;
+          lastMode = 4;
+        }
+
+        // startCircleTime = currentTime;
+
+
         break;
     }
 
@@ -265,7 +290,7 @@ void loop() {
     /*if(abs(desiredRhoVel) > 10){
         desiredRhoVel = 10 *desiredRhoVel/abs(desiredRhoVel);
     }*/
-
+  }
     phiVel = (r/d)*(vel[0]-vel[1]);
     rhoVel = (r/2)*(vel[0]+vel[1]);
 
@@ -276,13 +301,13 @@ void loop() {
     // Serial.print("\t");
     // Serial.print(currentEncoderCountRad[1]);
     // Serial.println("\t");
-    Serial.print(Rho);
+    Serial.print(Vbar);
     Serial.print("\t");
-    Serial.print(desiredRho);
+    Serial.print(deltaV);
     Serial.print("\t");
-    Serial.print(phi);
+    Serial.print(errorPhiVel);
     Serial.print("\t");
-    Serial.print(desiredPhi);
+    Serial.print(errorRhoVel);
     Serial.print("\t mode: ");
     Serial.print(mode);
     Serial.print("\t last mode: ");
@@ -303,9 +328,9 @@ void loop() {
 
     voltage[0] = (Vbar+deltaV)/2;
     voltage[1] = (Vbar - deltaV)/2;
-    if (mode == 0) {
-      voltage[0] = abs(voltage[0])*-1;
-    }
+    // if (mode == 0 || mode == 2) {
+    //   voltage[0] = abs(voltage[0])*-1;
+    // }
 
     for(int i = 0; i < 2; i++) {
       //PWM[i] = 255*abs(voltage[i])/batteryVoltage;
@@ -317,7 +342,7 @@ void loop() {
           analogWrite(MotorVoltage[i],abs(voltage[i]));
         }
     }
-  }
+  
 
     //Sets old values to new values
     errorRhoVelInitial = errorRhoVel;

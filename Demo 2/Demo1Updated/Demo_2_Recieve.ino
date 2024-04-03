@@ -52,61 +52,62 @@ void printReceived() {
   Serial.print(angleBit);
   Serial.println("");
 
-  // Decoding the bits to an average distance / angle
+   // Decoding the bits to an average distance / angle
   // DISTANCE
   if (distanceBit == 1) {
-    distance = 1;
+    desiredRho = 1;
   } else if (distanceBit == 2) {
-    distance = 0.875;
+    desiredRho = 0.875;
   } else if (distanceBit == 3) {
-    distance = 0.625;
+    desiredRho = 0.625;
   } else if (distanceBit == 4) {
-    distance = 0.425;
+    desiredRho = 0.425;
   } else if (distanceBit == 5) {
-    distance = 0.30;
+    desiredRho = 0.30;
   } else if (distanceBit == 6) {
-    distance = 0.20;
+    desiredRho = 0.20;
   } else if (distanceBit == 7) {
-    distance = 0.125;
+    desiredRho = 0.125;
   } else if (distanceBit == 8) {
-    distance = 0.65;
+    desiredRHo = 0.65;
   } else if (distanceBit == 9) {
-    distance = 0.00;
+    desiredRho = 0.00;
     circle_flag = true;
   }
 
   Serial.print("Distance: ");
-  Serial.print(distance);
+  Serial.print(desiredRho);
   Serial.println("");
 
   // ANGLE
   if (angleBit == 1) {
-    angle = -22.5;
+    desiredPhi = -22.5;
   } else if (angleBit == 2) {
-    angle = -15;
+    desiredPhi = -15;
   } else if (angleBit == 3) {
-    angle = -7.5;
+    desiredPhi = -7.5;
   } else if (angleBit == 4) {
-    angle = -3.5;
+    desiredPhi = -3.5;
   } else if (angleBit == 5) {
-    angle = 0;
+    desiredPhi = 0;
   } else if (angleBit == 6) {
-    angle = 3.5;
+    desiredPhi = 3.5;
   } else if (angleBit == 7) {
-    angle = 7.5;
+    desiredPhi = 7.5;
   } else if (angleBit == 8) {
-    angle = 15;
+    desiredPhi = 15;
   } else if (angleBit == 9) {
-    angle = 22.5;
+    desiredPhi = 22.5;
   }
 
-  angle = angle * 0.0174533;
+  desiredPhi = desiredPhi * 0.0174533;
 
   Serial.print("Angle: ");
-  Serial.print(angle);
+  Serial.print(desiredPhi);
   Serial.println("");
 
 }
+
 // function called when an I2C interrupt event happens
 void receive() {
   // Set the offset, this will always be the first byte.

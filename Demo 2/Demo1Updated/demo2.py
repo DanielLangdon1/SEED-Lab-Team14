@@ -96,7 +96,7 @@ def Send():
                         distance_bit2 = i[1]
                     i = int(i)
             
-            print(f"Bits: {distance_bit1} + {distance_bit2}")
+            #print(f"Bits: {distance_bit1} + {distance_bit2}")
 
             #Combine bits to one message to send to Arduino
             message = distance_bit1 + distance_bit2 + angle_bit
@@ -168,7 +168,7 @@ else:
                 print(f"distance is {distance}")
 
                 angle= degPerPixel *-((corners[0][0][3][0]+corners[0][0][2][0])/2 - 616)
-                print(f"Angle is {angle}")
+                #print(f"Angle is {angle}")
                 q.put(angle)
                 q2.put(distance)
 

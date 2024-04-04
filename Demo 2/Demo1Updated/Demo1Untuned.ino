@@ -20,10 +20,15 @@ desiredPhi and desiredDis in radians and meters respectively and if you connect 
 volatile uint8_t offset = 0;
 volatile uint8_t instruction[32] = {0};
 volatile uint8_t msgLength = 0;
-volatile uint8_t distanceBit = 0;
+volatile uint8_t distanceBit1 = 0;
+volatile uint8_t distanceBit2 = 0;
 volatile uint8_t angleBit = 0;
 volatile bool detection_flag = false;
 volatile bool circle_flag = false;
+volatile bool go_straight_flag=false;
+volatile bool go50 = false;
+volatile bool first_flag = true;
+volatile bool firstFlagPhi = true;
 
 // These lines define the pins each motor and encoder pins go to 
 const int MotorVoltage[2] = {10,9}; 
@@ -74,7 +79,7 @@ float desiredRhoVel = 0;
 float desiredPhiVel = 0;
 
 // Instantiates all variables for position controller
-float KiPhi = 0.45;
+float KiPhi = .45;
 float KdPhi = 0;
 float KpPhi = 45;
 
@@ -94,7 +99,7 @@ float derivativeRho = 0;
 float integralRho = 0;
 float desiredPhi = 0;
 float rotations = 0;
-float desiredRho = .3048; //m
+float desiredRho = 0; //m
 float errorPhi = 0;
 float derivativePhi = 0;
 float integralPhi = 0;
@@ -102,8 +107,9 @@ float phi = 0;
 int mode = 2;
 int lastMode = 2;
 float startCircleTime;
-int freq = 1;
-float stutter;
+float stutter = 0;
+float markerAngle = 0;
+float markerDistance = 0;
 
 
 
@@ -187,7 +193,7 @@ void setup() {
   initialTime = millis();
 
   // Variables for desired angle and distance to travel in radians and meters
-  desiredPhi = PI/2;
+  //desiredPhi = PI/2;
   // desiredRho = 0.3;
 }
 
@@ -225,42 +231,68 @@ void loop() {
 
     switch (mode) {
       case 0:
-        if (desiredPhi >= 0) {
-          desiredRhoVel = 0;
-          desiredPhiVel = 5;
-        } else if (desiredPhi < 0) {
-          desiredRhoVel = 0;
-          desiredPhiVel = -5;
+        // if (desiredPhi >= 0) {
+        //   desiredRhoVel = 0;
+        //   desiredPhiVel = 5;
+        // } else if (desiredPhi < 0) {
+        //   desiredRhoVel = 0;
+        //   desiredPhiVel = -5;
+        // }
+        desiredRho = 0;
+        if (firstFlagPhi) {
+          //desiredPhi = markerAngle;
         }
-        if (phi <= desiredPhi + PI/180 && phi >= desiredPhi-PI/180) {
+        firstFlagPhi = false;
+        if (phi <= desiredPhi + (3*PI/180) && phi >= desiredPhi+(-3*PI/180)) {
           Serial.print("reached desired phi");
           if(lastMode == 1){
-            lastMode = mode;
+            lastMode = 0;
             mode = 4;
             startCircleTime = currentTime;
-
+            delay(500);
           }
-          else if(lastMode == 2){
-            lastMode = mode;
+          else if(lastMode == 2 || go_straight_flag==true){
+            lastMode = 0;
             mode = 1;
-            
+            //desiredRho =.333;
+            count1 = 0;
+            count2 = 0;
             }
         }
       break;
       case 1:
-        //desiredRho = 2.5;
-        //desiredPhi = 0;
-        if(abs(Rho) >= (desiredRho) || circle_flag == true) {//reached marker
+        if (first_flag == true) {
+          desiredRho = markerDistance-.3;
+        }
+        first_flag = false;
+
+        /*if (go50 == true && lastMode != 3) {
+          mode = 3;
+          count1 = 0; 
+          count2 = 0;
+          desiredRhoVel = 0;
+          desiredPhiVel = 0;
+          desiredRho = 0;
+          lastMode = 1;
+          stutter = currentTime;
+        }*/
+
+        desiredPhi = markerAngle;
+        if(abs(Rho) >= abs(desiredRho)) {//reached marker
           Serial.print("reached desired Rho");
           lastMode = mode; 
           mode = 0; //turn 90deg
-          desiredPhi = PI/2;        
-          }
+          desiredPhi = PI/2;
+          count1 = 0;
+          count2 = 0;      
+        } 
       break;
       case 2: //spin while waiting
-        if (currentTime  < 2){
-          desiredPhiVel = 4;
-          desiredRho = 0;
+        desiredRhoVel = 0;
+        //desiredPhiVel = 7.5;
+        if (currentTime - stutter < 0.75){
+          desiredPhiVel = -7.5;
+          desiredRhoVel = 0;
           }
         else {
           stutter = currentTime;
@@ -275,11 +307,12 @@ void loop() {
           Serial.print("Found marker");
           desiredPhiVel = 0;
           desiredRhoVel = 0;
-          lastMode = mode;
+          lastMode = 2;
           mode = 0;
+          desiredPhi = markerAngle; 
           count1 = 0;
           count2 = 0;
-          delay(500);
+          delay(3000);
         }
         //delay(1000);
         break;
@@ -287,47 +320,51 @@ void loop() {
         Serial.print("waiting...");
         desiredPhiVel = 0;
         desiredRhoVel = 0;
-        if(lastMode == 2 && (currentTime - stutter > 5)){
+        if(lastMode == 2 && (currentTime - stutter >= 3.75)){
           lastMode = 3;
           mode = 2;
+          stutter = currentTime;
         }
-        // analogWrite(MotorVoltage[0], 0);
-        // analogWrite(MotorVoltage[1], 0);
+        // if (lastMode == 1 && (currentTime - stutter) >= 2) {
+        //   desiredRho = 0.45;
+        //   lastMode = 0;
+        //   mode = 1; 
+        // }
+        analogWrite(MotorVoltage[0], 0);
+        analogWrite(MotorVoltage[1], 0);
+      break;
       case 4:
         Serial.print("tracing... ");
         desiredRhoVel = 5;
         desiredPhiVel = desiredRhoVel/(.3048*2);
-        if (startCircleTime-currentTime >= 7) {
+        if (currentTime-startCircleTime >= 7.15) {
           desiredRhoVel = 0;
           desiredPhiVel = 0;
           mode = 3;
           lastMode = 4;
         }
-
         // startCircleTime = currentTime;
-
-
         break;
     }
-
+  
   //Serial.println(mode);
-  if(mode == 1 || mode == 0 || mode == 2) {
+  if(mode == 1 || mode == 0) {
     errorPhi = desiredPhi - phi;
     derivativePhi = (errorPhi - errorPhiInitial)/((float)(desired_Ts_ms/1000));
     integralPhi = integralPhi + errorPhi*((float)(desired_Ts_ms/1000));
     desiredPhiVel = errorPhi*KpPhi + KdPhi*derivativePhi + KiPhi*integralPhi;
-    if(abs(desiredPhiVel) > 10){
+    /*if(abs(desiredPhiVel) > 10){
       desiredPhiVel = 10 *desiredPhiVel/abs(desiredPhiVel);
-    }
+    }*/
 
     errorRho = desiredRho - Rho;
     derivativeRho = (errorRho - errorRhoInitial)/((float)(desired_Ts_ms/1000));
     integralRho = integralRho + errorRho*((float)(desired_Ts_ms/1000));
     desiredRhoVel = errorRho*KpRho + KdRho*derivativeRho + KiRho*integralRho;
 
-    /*if(abs(desiredRhoVel) > 10){
-        desiredRhoVel = 10 *desiredRhoVel/abs(desiredRhoVel);
-    }*/
+    if(abs(desiredRhoVel) > 7){
+        desiredRhoVel = 7 *desiredRhoVel/abs(desiredRhoVel);
+    }
   }
     phiVel = (r/d)*(vel[0]-vel[1]);
     rhoVel = (r/2)*(vel[0]+vel[1]);
@@ -335,41 +372,24 @@ void loop() {
     errorRhoVel = rhoVel - desiredRhoVel;
     errorPhiVel = phiVel - desiredPhiVel;
 
-    // Serial.print(currentEncoderCountRad[0]);
+    // Serial.print(desiredRho);
     // Serial.print("\t");
-    // Serial.print(currentEncoderCountRad[1]);
-    // Serial.println("\t");
-    Serial.print(Vbar);
-    Serial.print("\t");
-    Serial.print(deltaV);
-    Serial.print("\t");
-    Serial.print(errorPhiVel);
-    Serial.print("\t");
-    Serial.print(errorRhoVel);
-    Serial.print("\t mode: ");
-    Serial.print(mode);
-    Serial.print("\t last mode: ");
-    Serial.print(lastMode);
-    Serial.print("\t voltage: ");
-    Serial.print(voltage[0]);
-    Serial.print("\t");
-    Serial.println(voltage[1]);
+    // Serial.print(Rho);
+    // Serial.print("\t mode ");
+    // Serial.print(mode);
     // Serial.print("\t");
-    // Serial.print(rhoVel);
+    // Serial.print(desiredPhi);
     // Serial.print("\t");
-    // Serial.print(derivativeRho);
+    // Serial.print(phi);
     // Serial.print("\t");
-    // Serial.println(errorRho);
+    // Serial.println(circle_flag);
 
     Vbar = errorRhoVel*KpRhoVel;
     deltaV = errorPhiVel*KpPhiVel;
 
     voltage[0] = (Vbar+deltaV)/2;
     voltage[1] = (Vbar - deltaV)/2;
-    // if (mode == 0 || mode == 2) {
-    //   voltage[0] = abs(voltage[0])*-1;
-    // }
-
+  if (mode != 3) {
     for(int i = 0; i < 2; i++) {
       //PWM[i] = 255*abs(voltage[i])/batteryVoltage;
       if(voltage[i] >= 0) {
@@ -380,6 +400,10 @@ void loop() {
           analogWrite(MotorVoltage[i],abs(voltage[i]));
         }
     }
+  } else if (mode == 3) {
+    analogWrite(MotorVoltage[0],0);
+    analogWrite(MotorVoltage[1],0);
+  }
   
 
     //Sets old values to new values
@@ -387,7 +411,6 @@ void loop() {
     errorPhiVelInitial = errorPhiVelInitial;
     errorRhoInitial = errorRho;
     errorPhiInitial = errorPhi;
-    freq++;
     for(int i = 0;i<2;i++){ 
       initialEncoderCount[i] = currentEncoderCount[i];
       initialEncoderCountRad[i] = currentEncoderCountRad[i];
@@ -411,11 +434,12 @@ void printReceived() {
   Serial.println(""); 
 
   // Pulling info from our Pi encoding
-  distanceBit =  instruction[0] - 48;
-  angleBit = instruction[1] - 48;
+  distanceBit1 =  instruction[0] - 48;
+  distanceBit2 =  instruction[1] - 48;
+  angleBit = instruction[2] - 48;
 
   Serial.print("Distance bit: ");
-  Serial.print(distanceBit);
+  Serial.print((distanceBit1 * 10) + distanceBit2);
   Serial.println("");
 
   Serial.print("Angle bit: ");
@@ -424,29 +448,36 @@ void printReceived() {
 
   // Decoding the bits to an average distance / angle
   // DISTANCE
-  if (distanceBit == 1) {
-    desiredRho = 1;
-  } else if (distanceBit == 2) {
-    desiredRho = 0.875;
-  } else if (distanceBit == 3) {
-    desiredRho = 0.625;
-  } else if (distanceBit == 4) {
-    desiredRho = 0.425;
-  } else if (distanceBit == 5) {
-    desiredRho = 0.30;
-  } else if (distanceBit == 6) {
-    desiredRho = 0.20;
-  } else if (distanceBit == 7) {
-    desiredRho = 0.125;
-  } else if (distanceBit == 8) {
-    desiredRho = 0.65;
-  } else if (distanceBit == 9) {
-    desiredRho = 0.00;
-    circle_flag = true;
+  if (mode == 0) {
+    desiredRho = 0;
   }
+  /*
+  else if (distanceBit == 1) {
+    markerDistance = 3.5;
+  } else if (distanceBit == 2) {
+    markerDistance = 3;
+  } else if (distanceBit == 3) {
+    markerDistance = 2.5;
+  } else if (distanceBit == 4) {
+    markerDistance = 2;
+  } else if (distanceBit == 5) {
+    markerDistance = 1.5;
+  } else if (distanceBit == 6) {
+    markerDistance = 1;
+  } else if (distanceBit == 7) {
+    markerDistance = 0.75;
+  } else if (distanceBit == 8) {
+    markerDistance = 0.55;
+  } else if (distanceBit == 9) {
+    markerDistance = 0.5;
+    go50 = true;
+  }
+  */
+
+  markerDistance = ((distanceBit1 * 10) + distanceBit2) * 0.025;
 
   Serial.print("Distance: ");
-  Serial.print(desiredRho);
+  Serial.print(markerDistance);
   Serial.println("");
 
   // ANGLE
@@ -454,45 +485,47 @@ void printReceived() {
     // do nothing
   }
   else if (angleBit == 1) {
-    desiredPhi = -22.5;
-    desiredPhi = desiredPhi * 0.0174533;
+    markerAngle = -26.25;
+    markerAngle = markerAngle * 0.0174533;
 
   } else if (angleBit == 2) {
-    desiredPhi = -15;
-    desiredPhi = desiredPhi * 0.0174533;
+    markerAngle = -18.75;
+    markerAngle = markerAngle * 0.0174533;
 
   } else if (angleBit == 3) {
-    desiredPhi = -7.5;
-    desiredPhi = desiredPhi * 0.0174533;
+    markerAngle = -11.25;
+    markerAngle = markerAngle * 0.0174533;
 
   } else if (angleBit == 4) {
-    desiredPhi = -3.5;
-    desiredPhi = desiredPhi * 0.0174533;
+    markerAngle = -5.25;
+    markerAngle = markerAngle * 0.0174533;
 
   } else if (angleBit == 5) {
-    desiredPhi = 0;
-    desiredPhi = desiredPhi * 0.0174533;
+    markerAngle = 0;
+    markerAngle = markerAngle * 0.0174533;
+    go_straight_flag=true;
+    //mode = 1;
 
   } else if (angleBit == 6) {
-    desiredPhi = 3.5;
-    desiredPhi = desiredPhi * 0.0174533;
+    markerAngle = 5.25;
+    markerAngle = markerAngle * 0.0174533;
 
   } else if (angleBit == 7) {
-    desiredPhi = 7.5;
-    desiredPhi = desiredPhi * 0.0174533;
+    markerAngle = 11.25;
+    markerAngle = markerAngle * 0.0174533;
 
   } else if (angleBit == 8) {
-    desiredPhi = 15;
-    desiredPhi = desiredPhi * 0.0174533;
+    markerAngle = 18.75;
+    markerAngle = markerAngle * 0.0174533;
 
   } else if (angleBit == 9) {
-    desiredPhi = 22.5;
-    desiredPhi = desiredPhi * 0.0174533;
+    markerAngle = 26.25;
+    markerAngle = markerAngle * 0.0174533;
   }
 
 
   Serial.print("Angle: ");
-  Serial.print(desiredPhi);
+  Serial.print(markerAngle);
   Serial.println("");
 
 }

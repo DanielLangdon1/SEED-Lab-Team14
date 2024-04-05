@@ -95,6 +95,7 @@ def Send():
                         distance_bit1 = i[0]
                         distance_bit2 = i[1]
                     i = int(i)
+		    break
             
             #print(f"Bits: {distance_bit1} + {distance_bit2}")
 

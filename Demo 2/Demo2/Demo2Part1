@@ -252,6 +252,7 @@ void loop() {
         }
       }
       break;
+
     case 1: //Go straight using PID controller
 
       if (abs(Rho) >= abs(desiredRho)) {                                                    //reached marker

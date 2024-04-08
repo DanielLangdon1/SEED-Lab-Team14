@@ -244,42 +244,42 @@ void loop() {
         // Serial.print("reached desired phi");
         if (lastMode == 2 || go_straight_flag == true) {  // go into straight case 
 
-          resetVelController(); //void left over junk values
+          resetVelController();                                                             //void left over junk values
           desiredRhoVel = 0; 
           lastMode = 0;
           mode = 1; // go straight
-          desiredRho = markerDistance - .10; //stop 10 cm away from marker
+          desiredRho = markerDistance - .10;                                                 //stop 10 cm away from marker
         }
       }
       break;
     case 1: //Go straight using PID controller
 
-      if (abs(Rho) >= abs(desiredRho)) {  //reached marker
+      if (abs(Rho) >= abs(desiredRho)) {                                                    //reached marker
         lastMode = mode;
-        mode = 3;  //wait to get graded
+        mode = 3;                                      //wait to get graded
       }
       break;
-    case 2:  //scan environment while waiting for camera
+    case 2:                //scan environment while waiting for camera
 
       desiredRhoVel = 0;
       //desiredPhiVel = 7.5;
 
-      if (currentTime - stutter < 0.75 && detection_flag != true && detection_flag != true) { //bounce between wait case and scan case to allow camera time to calculate and send
+      if (currentTime - stutter < 0.75 && detection_flag != true && detection_flag != true) {         //bounce between wait case and scan case to allow camera time to calculate and send
         desiredPhiVel = -7.5;
         desiredRhoVel = 0;
       } else {
-        stutter = currentTime; //keep track of wait time
+        stutter = currentTime;       //keep track of wait time
         lastMode = mode;
         resetVelController();
 
         mode = 3;
       }
-      if (detection_flag == true) { // camera sends data
+      if (detection_flag == true) {     // camera sends data
         Serial.print("Found marker");
         resetVelController();
         lastMode = 2;
         mode = 0;
-        desiredPhi = markerAngle; //turn towards marker
+        desiredPhi = markerAngle;       //turn towards marker
 
         delay(1500);
       }
@@ -287,16 +287,16 @@ void loop() {
       break;
     case 3:  //wait
       Serial.print("waiting...");
-      desiredPhiVel = 0; //want no motion in rho of phi
+      desiredPhiVel = 0;                 //want no motion in rho of phi
       desiredRhoVel = 0; 
       desiredPhi = 0;
       desiredRho = 0;
-      if (lastMode == 2 && (currentTime - stutter >= 3.75)) { // go to scan case when done waiting for camera
+      if (lastMode == 2 && (currentTime - stutter >= 3.75)) {     // go to scan case when done waiting for camera
         lastMode = 3;
         mode = 2;
         stutter = currentTime; //
       }
-      analogWrite(MotorVoltage[0], 0);//catchall for do nothing case
+      analogWrite(MotorVoltage[0], 0);            //catchall for do nothing case
       analogWrite(MotorVoltage[1], 0);
       break;
   }
@@ -327,7 +327,7 @@ void loop() {
   errorPhiVel = phiVel - desiredPhiVel;
 
 
-  Serial.print("\t mode ");//debugging prints
+  Serial.print("\t mode ");            //debugging prints
   Serial.print(mode);
   Serial.print("\t");
   Serial.print(desiredPhi);
@@ -345,13 +345,13 @@ void loop() {
   voltage[1] = (Vbar - deltaV) / 2;
   
   if (mode != 3) { //wait case
-    for (int i = 0; i < 2; i++) {  // for each wheel
-      if (voltage[i] >= 0) {       //turn correct direction
+    for (int i = 0; i < 2; i++) {                      // for each wheel
+      if (voltage[i] >= 0) {                           //turn correct direction
         digitalWrite(MotorSign[i], HIGH);
         analogWrite(MotorVoltage[i], abs(voltage[i]));  //apply voltage to motors
       } else {
         digitalWrite(MotorSign[i], LOW);
-        analogWrite(MotorVoltage[i], abs(voltage[i]));  // apply motor voltage
+        analogWrite(MotorVoltage[i], abs(voltage[i]));  
       }
     }
   } else if (mode == 3) {  //mode 3 does nothing

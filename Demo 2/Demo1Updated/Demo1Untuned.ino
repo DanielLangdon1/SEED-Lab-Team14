@@ -15,52 +15,51 @@ desiredPhi and desiredDis in radians and meters respectively and if you connect 
 
 #include <Wire.h>
 #define MY_ADDR 8
-#define PI 3.14159265358979323 // Defines irrational number PI for mathematical use later
+#define PI 3.14159265358979323  // Defines irrational number PI for mathematical use later
 
 volatile uint8_t offset = 0;
-volatile uint8_t instruction[32] = {0};
+volatile uint8_t instruction[32] = { 0 };
 volatile uint8_t msgLength = 0;
 volatile uint8_t distanceBit1 = 0;
 volatile uint8_t distanceBit2 = 0;
 volatile uint8_t angleBit = 0;
 volatile bool detection_flag = false;
 volatile bool circle_flag = false;
-volatile bool go_straight_flag=false;
-volatile bool go50 = false;
+volatile bool go_straight_flag = false;
 volatile bool first_flag = true;
 volatile bool firstFlagPhi = true;
 
-// These lines define the pins each motor and encoder pins go to 
-const int MotorVoltage[2] = {10,9}; 
-const int MotorSign[2] = {8,7};
-const int encoderInterrupts[2] = {2,3};
-const int encoderPins[2] = {5,6};
+// These lines define the pins each motor and encoder pins go to
+const int MotorVoltage[2] = { 10, 9 };
+const int MotorSign[2] = { 8, 7 };
+const int encoderInterrupts[2] = { 2, 3 };
+const int encoderPins[2] = { 5, 6 };
 const int MotorEnable = 4;
 
 // Defines desired delay time
 float desired_Ts_ms = 10;
 float last_time_ms;
 
-float d = 0.3556; //m between middles of wheels
-float r = 0.07; //wheel rad m
+float d = 0.3556;  //m between middles of wheels
+float r = 0.07;    //wheel rad m
 
-float lastEncoderTime[2]; //Initializes time variable for use in ISR
-float startTime; //Set up in Setup function to calculate current time in loop
-float initialTime; //Used to calculate time elapsed for velocity
-float lastTime; //Used to compute current time
-float currentTime; //Initializes current time for loop
+float lastEncoderTime[2];  //Initializes time variable for use in ISR
+float startTime;           //Set up in Setup function to calculate current time in loop
+float initialTime;         //Used to calculate time elapsed for velocity
+float lastTime;            //Used to compute current time
+float currentTime;         //Initializes current time for loop
 float timeElapsed;
 
 
-int count1 = 0; //Initializes encoder counts for the ISR
-int count2 = 0; //Initializes encoder counts for the second encoder ISR
-int currentEncoderCount[2] = {0,0}; //Intilization for Encoder Counts to be used in loop 
-float currentEncoderCountRad[2] = {0,0}; //Converted counts to radian for velocity in rad
-int initialEncoderCount[2] = {0,0}; //Found in setup to check for change in counts
-float initialEncoderCountRad[2] = {0,0}; //Radian version of initial count
-float vel[2] = {0,0}; //Velocity found from timeelapsed and count/radian change;
-float voltage[2] = {0,0}; // voltage to be used for speed and position control
-float batteryVoltage = 7.8; //Sets saturation point for battery
+int count1 = 0;                              //Initializes encoder counts for the ISR
+int count2 = 0;                              //Initializes encoder counts for the second encoder ISR
+int currentEncoderCount[2] = { 0, 0 };       //Intilization for Encoder Counts to be used in loop
+float currentEncoderCountRad[2] = { 0, 0 };  //Converted counts to radian for velocity in rad
+int initialEncoderCount[2] = { 0, 0 };       //Found in setup to check for change in counts
+float initialEncoderCountRad[2] = { 0, 0 };  //Radian version of initial count
+float vel[2] = { 0, 0 };                     //Velocity found from timeelapsed and count/radian change;
+float voltage[2] = { 0, 0 };                 // voltage to be used for speed and position control
+float batteryVoltage = 7.8;                  //Sets saturation point for battery
 
 // Instantiates all variables for the velocity controller
 float phiVel = 0;
@@ -74,7 +73,7 @@ float deltaV = 0;
 float errorRhoVelInitial = 0;
 float errorPhiVelInitial = 0;
 float integralRhoVel = 0;
-float integralPhiVel = 0; 
+float integralPhiVel = 0;
 float desiredRhoVel = 0;
 float desiredPhiVel = 0;
 
@@ -99,7 +98,7 @@ float derivativeRho = 0;
 float integralRho = 0;
 float desiredPhi = 0;
 float rotations = 0;
-float desiredRho = 0; //m
+float desiredRho = 0;  //m
 float errorPhi = 0;
 float derivativePhi = 0;
 float integralPhi = 0;
@@ -108,18 +107,18 @@ int mode = 2;
 int lastMode = 2;
 float startCircleTime;
 float stutter = 0;
-float markerAngle = 0;
-float markerDistance = 0;
+float markerAngle;
+float markerDistance;
 
 
 
 //ISR to check for a change in state of the encoder
 void myISR1() {
-  if(micros() - lastEncoderTime[0] > 100) {
-    if(digitalRead(encoderInterrupts[0]) == digitalRead(encoderPins[0])) {
+  if (micros() - lastEncoderTime[0] > 100) {
+    if (digitalRead(encoderInterrupts[0]) == digitalRead(encoderPins[0])) {
       count1++;
       count1++;
-    } else{
+    } else {
       count1--;
       count1--;
     }
@@ -129,11 +128,11 @@ void myISR1() {
 
 //ISR to check for a change in state of the encoder
 void myISR2() {
-  if(micros() - lastEncoderTime[1] > 100) {
-    if(digitalRead(encoderInterrupts[1]) == digitalRead(encoderPins[1])) {
+  if (micros() - lastEncoderTime[1] > 100) {
+    if (digitalRead(encoderInterrupts[1]) == digitalRead(encoderPins[1])) {
       count2++;
       count2++;
-    } else{
+    } else {
       count2--;
       count2--;
     }
@@ -143,40 +142,40 @@ void myISR2() {
 
 //Function to return encoder counts
 int MyEnc1() {
-  if(digitalRead(encoderInterrupts[0]) != digitalRead(encoderPins[0])) {
-    return(count1+1);
-  } else{
-    return(count1);
+  if (digitalRead(encoderInterrupts[0]) != digitalRead(encoderPins[0])) {
+    return (count1 + 1);
+  } else {
+    return (count1);
   }
 }
 
 //Function to return encoder counts
 int MyEnc2() {
-  if(digitalRead(encoderInterrupts[1]) != digitalRead(encoderPins[1])) {
-    return(count2+1);
-  } else{
-    return(count2);
+  if (digitalRead(encoderInterrupts[1]) != digitalRead(encoderPins[1])) {
+    return (count2 + 1);
+  } else {
+    return (count2);
   }
 }
 
 void setup() {
   // put your setup code here, to run once:
   // For loop to assign pins as outputs/inputs and sets encoders to high for pullup resistor
-  for(int i = 0; i<2; i++) {
-    pinMode(MotorVoltage[i],OUTPUT);
-    pinMode(MotorSign[i],OUTPUT);
-    pinMode(encoderInterrupts[i],INPUT);
-    digitalWrite(encoderInterrupts[i],HIGH);
+  for (int i = 0; i < 2; i++) {
+    pinMode(MotorVoltage[i], OUTPUT);
+    pinMode(MotorSign[i], OUTPUT);
+    pinMode(encoderInterrupts[i], INPUT);
+    digitalWrite(encoderInterrupts[i], HIGH);
   }
   attachInterrupt(digitalPinToInterrupt(encoderInterrupts[0]), myISR1, CHANGE);
   attachInterrupt(digitalPinToInterrupt(encoderInterrupts[1]), myISR2, CHANGE);
   pinMode(MotorEnable, OUTPUT);
-  digitalWrite(MotorEnable,HIGH);
+  digitalWrite(MotorEnable, HIGH);
 
   initialEncoderCount[0] = MyEnc1();
   initialEncoderCount[1] = MyEnc2();
-  for (int i = 0; i < 2; i++){
-    initialEncoderCountRad[i] = 2*PI*(float)(initialEncoderCount[i])/3200;
+  for (int i = 0; i < 2; i++) {
+    initialEncoderCountRad[i] = 2 * PI * (float)(initialEncoderCount[i]) / 3200;
     lastEncoderTime[i] = micros();
   }
 
@@ -198,244 +197,200 @@ void setup() {
 }
 
 void loop() {
-  // put your main code here, to run repeatedly:
-  // analogWrite(MotorVoltage[0],100);
 
-    // If there is data on the buffer, read it
+  // If there is data on the buffer, read it
   if (msgLength > 0) {
-    if (offset==1) {
-      digitalWrite(LED_BUILTIN,instruction[0]);
+    if (offset == 1) {
+      digitalWrite(LED_BUILTIN, instruction[0]);
     }
     printReceived();
     msgLength = 0;
   }
 
-    lastTime = millis();
-    //Compute current time
-    currentTime = (float)((lastTime-startTime)/1000);
-    timeElapsed = (float)(millis()-initialTime)/1000;
-    currentEncoderCount[0] = MyEnc1();
-    currentEncoderCount[1] = MyEnc2();
+  lastTime = millis();
+  //Compute current time
+  currentTime = (float)((lastTime - startTime) / 1000);
+  timeElapsed = (float)(millis() - initialTime) / 1000;
+  currentEncoderCount[0] = MyEnc1();
+  currentEncoderCount[1] = MyEnc2();
 
 
-    for(int i = 0;i<2;i++){ // set encoders to radians and finds velocity
-      currentEncoderCountRad[i] = 2*PI*(float)(currentEncoderCount[i])/3200;
-      if(timeElapsed > 0 ){
-        vel[i] = (currentEncoderCountRad[i]-initialEncoderCountRad[i])/timeElapsed;
+  for (int i = 0; i < 2; i++) {  // set encoders to radians and finds velocity
+    currentEncoderCountRad[i] = 2 * PI * (float)(currentEncoderCount[i]) / 3200;
+    if (timeElapsed > 0) {
+      vel[i] = (currentEncoderCountRad[i] - initialEncoderCountRad[i]) / timeElapsed;
+    }
+  }
+  Rho = (r / 2) * (currentEncoderCountRad[0] + currentEncoderCountRad[1]);
+  phi = (r / d) * (currentEncoderCountRad[0] - currentEncoderCountRad[1]);
+
+
+
+  switch (mode) {
+    case 0:  // case to turn a desired angle phi
+      desiredRho = 0;
+      desiredRhoVel = 0;  ////might cause issues
+      // if (detection_flag && firstFlagPhi) {// if camera sees marker
+      //   desiredPhi = markerAngle; //desired angle to marker angle
+      // }
+      // firstFlagPhi = false; // never again
+
+      if (phi <= (desiredPhi + (3 * PI / 180)) && phi >= (desiredPhi + (-3 * PI / 180))) {  // if atobot is correctly oriented towards marker within 3 deg
+        // Serial.print("reached desired phi");
+        if (lastMode == 2 || go_straight_flag == true) {  // go straight
+          // count1 = 0;
+          // count2 = 0;
+          resetVelController();
+          desiredRhoVel = 0;
+          lastMode = 0;
+          mode = 1;
+          desiredRho = markerDistance - .10;
+        }
       }
-    }
-    Rho = (r/2)*(currentEncoderCountRad[0]+currentEncoderCountRad[1]);
-    phi = (r/d) * (currentEncoderCountRad[0]-currentEncoderCountRad[1]);
-
-
-
-    switch (mode) {
-      case 0:
-        // if (desiredPhi >= 0) {
-        //   desiredRhoVel = 0;
-        //   desiredPhiVel = 5;
-        // } else if (desiredPhi < 0) {
-        //   desiredRhoVel = 0;
-        //   desiredPhiVel = -5;
-        // }
-        desiredRho = 0;
-        if (firstFlagPhi) {
-          //desiredPhi = markerAngle;
-        }
-        firstFlagPhi = false;
-        if (phi <= desiredPhi + (3*PI/180) && phi >= desiredPhi+(-3*PI/180)) {
-          Serial.print("reached desired phi");
-          if(lastMode == 1){
-            lastMode = 0;
-            mode = 4;
-            startCircleTime = currentTime;
-            delay(500);
-          }
-          else if(lastMode == 2 || go_straight_flag==true){
-            lastMode = 0;
-            mode = 1;
-            //desiredRho =.333;
-            count1 = 0;
-            count2 = 0;
-            }
-        }
       break;
-      case 1:
-        if (first_flag == true) {
-          desiredRho = markerDistance-.3;
-        }
-        first_flag = false;
+    case 1:
+      // if (first_flag == true) { // set desired Rho to given camera distance once
+      // desiredPhi = markerAngle;
+      if (abs(Rho) >= abs(desiredRho)) {  //reached marker
+        // Serial.print("reached desired Rho");
+        lastMode = mode;
+        mode = 3;  //wait to get graded
+      }
+      break;
+    case 2:  //spin while waiting
 
-        /*if (go50 == true && lastMode != 3) {
-          mode = 3;
-          count1 = 0; 
-          count2 = 0;
-          desiredRhoVel = 0;
-          desiredPhiVel = 0;
-          desiredRho = 0;
-          lastMode = 1;
-          stutter = currentTime;
-        }*/
+      desiredRhoVel = 0;
+      //desiredPhiVel = 7.5;
 
+      if (currentTime - stutter < 0.75 && detection_flag != true && detection_flag != true) {
+        desiredPhiVel = -7.5;
+        desiredRhoVel = 0;
+      } else {
+        stutter = currentTime;
+        lastMode = mode;
+        resetVelController();
+        // desiredPhiVel = 0;
+        // desiredRhoVel = 0;
+        mode = 3;
+      }
+      if (detection_flag == true) {
+        Serial.print("Found marker");
+        // count1 = 0;
+        // count2 = 0;
+        // desiredPhiVel = 0;  //resetVelController
+        // desiredRhoVel = 0;
+        resetVelController();
+        lastMode = 2;
+        mode = 0;
         desiredPhi = markerAngle;
-        if(abs(Rho) >= abs(desiredRho)) {//reached marker
-          Serial.print("reached desired Rho");
-          lastMode = mode; 
-          mode = 0; //turn 90deg
-          desiredPhi = PI/2;
-          count1 = 0;
-          count2 = 0;      
-        } 
+
+        delay(1500);
+      }
+
       break;
-      case 2: //spin while waiting
-        desiredRhoVel = 0;
-        //desiredPhiVel = 7.5;
-        if (currentTime - stutter < 0.75){
-          desiredPhiVel = -7.5;
-          desiredRhoVel = 0;
-          }
-        else {
-          stutter = currentTime;
-          lastMode = mode;
-          desiredPhiVel = 0;
-          desiredRhoVel = 0;
-          mode = 3;
-        }
-        
-        
-        if (detection_flag == true){
-          Serial.print("Found marker");
-          desiredPhiVel = 0;
-          desiredRhoVel = 0;
-          lastMode = 2;
-          mode = 0;
-          desiredPhi = markerAngle; 
-          count1 = 0;
-          count2 = 0;
-          delay(3000);
-        }
-        //delay(1000);
-        break;
-      case 3: //wait
-        Serial.print("waiting...");
-        desiredPhiVel = 0;
-        desiredRhoVel = 0;
-        if(lastMode == 2 && (currentTime - stutter >= 3.75)){
-          lastMode = 3;
-          mode = 2;
-          stutter = currentTime;
-        }
-        // if (lastMode == 1 && (currentTime - stutter) >= 2) {
-        //   desiredRho = 0.45;
-        //   lastMode = 0;
-        //   mode = 1; 
-        // }
-        analogWrite(MotorVoltage[0], 0);
-        analogWrite(MotorVoltage[1], 0);
+    case 3:  //wait
+      Serial.print("waiting...");
+      desiredPhiVel = 0;
+      desiredRhoVel = 0;  //resetVelController
+      desiredPhi = 0;
+      desiredRho = 0;
+      if (lastMode == 2 && (currentTime - stutter >= 3.75)) {
+        lastMode = 3;
+        mode = 2;
+        stutter = currentTime;
+      }
+      analogWrite(MotorVoltage[0], 0);
+      analogWrite(MotorVoltage[1], 0);
       break;
-      case 4:
-        Serial.print("tracing... ");
-        desiredRhoVel = 5;
-        desiredPhiVel = desiredRhoVel/(.3048*2);
-        if (currentTime-startCircleTime >= 7.15) {
-          desiredRhoVel = 0;
-          desiredPhiVel = 0;
-          mode = 3;
-          lastMode = 4;
-        }
-        // startCircleTime = currentTime;
-        break;
-    }
-  
+  }
+
   //Serial.println(mode);
-  if(mode == 1 || mode == 0) {
-    errorPhi = desiredPhi - phi;
-    derivativePhi = (errorPhi - errorPhiInitial)/((float)(desired_Ts_ms/1000));
-    integralPhi = integralPhi + errorPhi*((float)(desired_Ts_ms/1000));
-    desiredPhiVel = errorPhi*KpPhi + KdPhi*derivativePhi + KiPhi*integralPhi;
-    /*if(abs(desiredPhiVel) > 10){
-      desiredPhiVel = 10 *desiredPhiVel/abs(desiredPhiVel);
-    }*/
+  if (mode == 1 || mode == 0) {                                                      // if we need a velocity controller,
+    errorPhi = desiredPhi - phi;                                                     //error phi
+    derivativePhi = (errorPhi - errorPhiInitial) / ((float)(desired_Ts_ms / 1000));  //D controller
+    integralPhi = integralPhi + errorPhi * ((float)(desired_Ts_ms / 1000));          //I controller
+    desiredPhiVel = errorPhi * KpPhi + KdPhi * derivativePhi + KiPhi * integralPhi;  //PID controller
+    if (abs(desiredPhiVel) > 10) {
+      desiredPhiVel = 10 * desiredPhiVel / abs(desiredPhiVel);
+    }
 
     errorRho = desiredRho - Rho;
-    derivativeRho = (errorRho - errorRhoInitial)/((float)(desired_Ts_ms/1000));
-    integralRho = integralRho + errorRho*((float)(desired_Ts_ms/1000));
-    desiredRhoVel = errorRho*KpRho + KdRho*derivativeRho + KiRho*integralRho;
+    derivativeRho = (errorRho - errorRhoInitial) / ((float)(desired_Ts_ms / 1000));
+    integralRho = integralRho + errorRho * ((float)(desired_Ts_ms / 1000));
+    desiredRhoVel = errorRho * KpRho + KdRho * derivativeRho + KiRho * integralRho;
 
-    if(abs(desiredRhoVel) > 7){
-        desiredRhoVel = 7 *desiredRhoVel/abs(desiredRhoVel);
+    if (abs(desiredRhoVel) > 7) {
+      desiredRhoVel = 7 * desiredRhoVel / abs(desiredRhoVel);
     }
   }
-    phiVel = (r/d)*(vel[0]-vel[1]);
-    rhoVel = (r/2)*(vel[0]+vel[1]);
+  phiVel = (r / d) * (vel[0] - vel[1]);
+  rhoVel = (r / 2) * (vel[0] + vel[1]);
 
-    errorRhoVel = rhoVel - desiredRhoVel;
-    errorPhiVel = phiVel - desiredPhiVel;
+  errorRhoVel = rhoVel - desiredRhoVel;
+  errorPhiVel = phiVel - desiredPhiVel;
 
-    // Serial.print(desiredRho);
-    // Serial.print("\t");
-    // Serial.print(Rho);
-    // Serial.print("\t mode ");
-    // Serial.print(mode);
-    // Serial.print("\t");
-    // Serial.print(desiredPhi);
-    // Serial.print("\t");
-    // Serial.print(phi);
-    // Serial.print("\t");
-    // Serial.println(circle_flag);
 
-    Vbar = errorRhoVel*KpRhoVel;
-    deltaV = errorPhiVel*KpPhiVel;
+  Serial.print("\t mode ");
+  Serial.print(mode);
+  Serial.print("\t");
+  Serial.print(desiredPhi);
+  Serial.print("\t");
+  Serial.print(phi);
+  Serial.print("\t");
+  Serial.print(desiredRho);
+  Serial.print("\t");
+  Serial.println(Rho);
+  // Serial.println(circle_flag);
 
-    voltage[0] = (Vbar+deltaV)/2;
-    voltage[1] = (Vbar - deltaV)/2;
+  Vbar = errorRhoVel * KpRhoVel;
+  deltaV = errorPhiVel * KpPhiVel;
+
+  voltage[0] = (Vbar + deltaV) / 2;
+  voltage[1] = (Vbar - deltaV) / 2;
   if (mode != 3) {
-    for(int i = 0; i < 2; i++) {
-      //PWM[i] = 255*abs(voltage[i])/batteryVoltage;
-      if(voltage[i] >= 0) {
-        digitalWrite(MotorSign[i],HIGH);
-        analogWrite(MotorVoltage[i],abs(voltage[i]));
+    for (int i = 0; i < 2; i++) {  // for each wheel
+      if (voltage[i] >= 0) {       //turn correct direction
+        digitalWrite(MotorSign[i], HIGH);
+        analogWrite(MotorVoltage[i], abs(voltage[i]));  //apply voltage to motors
       } else {
-          digitalWrite(MotorSign[i],LOW);
-          analogWrite(MotorVoltage[i],abs(voltage[i]));
-        }
+        digitalWrite(MotorSign[i], LOW);
+        analogWrite(MotorVoltage[i], abs(voltage[i]));  // apply motor voltage
+      }
     }
-  } else if (mode == 3) {
-    analogWrite(MotorVoltage[0],0);
-    analogWrite(MotorVoltage[1],0);
-  }
-  
-
-    //Sets old values to new values
-    errorRhoVelInitial = errorRhoVel;
-    errorPhiVelInitial = errorPhiVelInitial;
-    errorRhoInitial = errorRho;
-    errorPhiInitial = errorPhi;
-    for(int i = 0;i<2;i++){ 
-      initialEncoderCount[i] = currentEncoderCount[i];
-      initialEncoderCountRad[i] = currentEncoderCountRad[i];
-
-    }
-    initialTime = millis();
-    while(millis()<last_time_ms+desired_Ts_ms){
-      //wait till desired time passes
-    }
-    last_time_ms = millis();
-
+  } else if (mode == 3) {  //mode 3 does nothing
+    analogWrite(MotorVoltage[0], 0);
+    analogWrite(MotorVoltage[1], 0);
   }
 
-  // printReceived helps us see what data we are getting from the leader
+
+  //Sets old values to new values
+  // errorRhoVelInitial = errorRhoVel;
+  // errorPhiVelInitial = errorPhiVel;
+  errorRhoInitial = errorRho;
+  errorPhiInitial = errorPhi;
+  for (int i = 0; i < 2; i++) {
+    initialEncoderCount[i] = currentEncoderCount[i];
+    initialEncoderCountRad[i] = currentEncoderCountRad[i];
+  }
+  initialTime = millis();
+  while (millis() < last_time_ms + desired_Ts_ms) {
+    //wait till desired time passes
+  }
+  last_time_ms = millis();
+}
+
+// printReceived helps us see what data we are getting from the leader
 void printReceived() {
   detection_flag = true;
   Serial.print("Message: ");
-  for (int i=0;i<msgLength;i++) {
-    Serial.print(String((char) instruction[i]));
+  for (int i = 0; i < msgLength; i++) {
+    Serial.print(String((char)instruction[i]));
   }
-  Serial.println(""); 
+  Serial.println("");
 
   // Pulling info from our Pi encoding
-  distanceBit1 =  instruction[0] - 48;
-  distanceBit2 =  instruction[1] - 48;
+  distanceBit1 = instruction[0] - 48;
+  distanceBit2 = instruction[1] - 48;
   angleBit = instruction[2] - 48;
 
   Serial.print("Distance bit: ");
@@ -483,8 +438,7 @@ void printReceived() {
   // ANGLE
   if (circle_flag == true) {
     // do nothing
-  }
-  else if (angleBit == 1) {
+  } else if (angleBit == 1) {
     markerAngle = -26.25;
     markerAngle = markerAngle * 0.0174533;
 
@@ -503,7 +457,7 @@ void printReceived() {
   } else if (angleBit == 5) {
     markerAngle = 0;
     markerAngle = markerAngle * 0.0174533;
-    go_straight_flag=true;
+    go_straight_flag = true;
     //mode = 1;
 
   } else if (angleBit == 6) {
@@ -527,7 +481,6 @@ void printReceived() {
   Serial.print("Angle: ");
   Serial.print(markerAngle);
   Serial.println("");
-
 }
 
 
@@ -539,6 +492,17 @@ void receive() {
   while (Wire.available()) {
     instruction[msgLength] = Wire.read();
     msgLength++;
-    
   }
+}
+void resetVelController(){
+  phi = 0;
+  Rho = 0;
+  errorRho = 0;
+  errorPhi = 0;
+  errorPhiVel = 0;
+  errorRhoVel = 0;
+  count1 = 0;
+  count2 = 0;
+  desiredPhi = 0;
+  desiredRho = 0;
 }

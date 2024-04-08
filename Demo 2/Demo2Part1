@@ -1,6 +1,6 @@
 /*
-Names: Ian McGrath and Daniel Langdon
-Code: Demo 1
+Names: Tate Morrison, Max Allen, Ian McGrath, and Daniel Langdon
+Code: Demo 2
 Setup:
 Using the motor drive Polula Dual MC33926 Motor Driver shield, the Arduino Uno, and 
 a Voltage Monitor. Connect the Motor Driver onto the Arduino Uno, connect a battery to the
@@ -8,9 +8,10 @@ voltage monitor and connect the monitor to the motor driver through the two pins
 the motors to the two pins next to voltage pins of the motor driver and the encoder wired to an interrupt pin 2 or 3 
 and digital pin 5 or 6 with the blue and green wired going to Vcc and ground pins on the motor driver. The motor sign pins 
 allow voltage to flow to the motor and the Voltage pins send the voltage to allow the motor to spin. 
+Need to run a Raspberry Pi with a camera attached. Pi code looks for markers and sends angle and distance data to the A5 and A4 pins on the arduino 
 Code Usage:
-This code uses a PI controller to allow the wheels to travel a certain angle and distance and stop. You set these values in the setup called
-desiredPhi and desiredDis in radians and meters respectively and if you connect the arduino and upload the code it will turn that angle and drive that distance 
+This code, when used in conjunction with a robot that is correctly set up, will start in search mode, slowly scanning the environment, and allowing the camera time to find a marker and send it. When 
+the arduino recieves an angle and a distance, it will orient itself toward the marker and drive toward it, stopping about a foot short of the marker.
 */
 
 #include <Wire.h>
@@ -72,7 +73,7 @@ float Vbar = 0;
 float deltaV = 0;
 float errorRhoVelInitial = 0;
 float errorPhiVelInitial = 0;
-float integralRhoVel = 0;
+float integralRhoVel = 0; 
 float integralPhiVel = 0;
 float desiredRhoVel = 0;
 float desiredPhiVel = 0;
@@ -89,7 +90,7 @@ float KpRho = 2.3514;
 
 float KpRhoVel = 100;
 float KpPhiVel = 20;
-// float desiredRho = 50;
+// initialize all position controller variables
 float Rho = 0;
 float errorRho = 0;
 float errorRhoInitial = 0;
@@ -103,10 +104,13 @@ float errorPhi = 0;
 float derivativePhi = 0;
 float integralPhi = 0;
 float phi = 0;
-int mode = 2;
-int lastMode = 2;
-float startCircleTime;
-float stutter = 0;
+
+int mode = 2; //robot mode.  0-turn desiredPhi  1-move straight desiredRho 2- scan environment 3 -wait
+int lastMode = 2; 
+float startCircleTime; //used to calculate how long robot has been tracing
+float stutter = 0; //used to pause 360 scan. allows camera time to calculate and send
+
+// recieved data from camera
 float markerAngle;
 float markerDistance;
 
@@ -159,21 +163,22 @@ int MyEnc2() {
 }
 
 void setup() {
-  // put your setup code here, to run once:
-  // For loop to assign pins as outputs/inputs and sets encoders to high for pullup resistor
-  for (int i = 0; i < 2; i++) {
+
+  for (int i = 0; i < 2; i++) { // For loop to assign pins as outputs/inputs and sets encoders to high for pullup resistor
     pinMode(MotorVoltage[i], OUTPUT);
     pinMode(MotorSign[i], OUTPUT);
     pinMode(encoderInterrupts[i], INPUT);
     digitalWrite(encoderInterrupts[i], HIGH);
   }
-  attachInterrupt(digitalPinToInterrupt(encoderInterrupts[0]), myISR1, CHANGE);
+  
+  attachInterrupt(digitalPinToInterrupt(encoderInterrupts[0]), myISR1, CHANGE); //interrupt pins
   attachInterrupt(digitalPinToInterrupt(encoderInterrupts[1]), myISR2, CHANGE);
   pinMode(MotorEnable, OUTPUT);
   digitalWrite(MotorEnable, HIGH);
 
-  initialEncoderCount[0] = MyEnc1();
+  initialEncoderCount[0] = MyEnc1(); //encoder counts 
   initialEncoderCount[1] = MyEnc2();
+  
   for (int i = 0; i < 2; i++) {
     initialEncoderCountRad[i] = 2 * PI * (float)(initialEncoderCount[i]) / 3200;
     lastEncoderTime[i] = micros();
@@ -183,12 +188,13 @@ void setup() {
   // We want to control the built-in LED (pin 13)
   pinMode(LED_BUILTIN, OUTPUT);
 
+  //PI integration 
   // Initialize I2C
   Wire.begin(MY_ADDR);
   // Set callbacks for I2C interrupts
   Wire.onReceive(receive);
 
-  startTime = millis();
+  startTime = millis(); //startup variables for consistency
   initialTime = millis();
 
   // Variables for desired angle and distance to travel in radians and meters
@@ -199,7 +205,7 @@ void setup() {
 void loop() {
 
   // If there is data on the buffer, read it
-  if (msgLength > 0) {
+  if (msgLength > 0) {  //data from PI
     if (offset == 1) {
       digitalWrite(LED_BUILTIN, instruction[0]);
     }
@@ -207,82 +213,73 @@ void loop() {
     msgLength = 0;
   }
 
-  lastTime = millis();
-  //Compute current time
-  currentTime = (float)((lastTime - startTime) / 1000);
+  lastTime = millis(); //Compute current time
+  currentTime = (float)((lastTime - startTime) / 1000); //more time vars for time-keeping
   timeElapsed = (float)(millis() - initialTime) / 1000;
   currentEncoderCount[0] = MyEnc1();
   currentEncoderCount[1] = MyEnc2();
 
 
-  for (int i = 0; i < 2; i++) {  // set encoders to radians and finds velocity
-    currentEncoderCountRad[i] = 2 * PI * (float)(currentEncoderCount[i]) / 3200;
+  for (int i = 0; i < 2; i++) { //for each wheel
+    currentEncoderCountRad[i] = 2 * PI * (float)(currentEncoderCount[i]) / 3200; //find encoder counts in radians
     if (timeElapsed > 0) {
-      vel[i] = (currentEncoderCountRad[i] - initialEncoderCountRad[i]) / timeElapsed;
+      vel[i] = (currentEncoderCountRad[i] - initialEncoderCountRad[i]) / timeElapsed; // use encoders to find velocity
     }
   }
-  Rho = (r / 2) * (currentEncoderCountRad[0] + currentEncoderCountRad[1]);
+
+  //ATObot position vars
+  Rho = (r / 2) * (currentEncoderCountRad[0] + currentEncoderCountRad[1]); 
   phi = (r / d) * (currentEncoderCountRad[0] - currentEncoderCountRad[1]);
 
 
 
-  switch (mode) {
-    case 0:  // case to turn a desired angle phi
-      desiredRho = 0;
-      desiredRhoVel = 0;  ////might cause issues
-      // if (detection_flag && firstFlagPhi) {// if camera sees marker
-      //   desiredPhi = markerAngle; //desired angle to marker angle
-      // }
-      // firstFlagPhi = false; // never again
+  switch (mode) { // Start of case machine for ATObot modes
+    
+    case 0:  // turn a desired angle phi
+      
+      desiredRho = 0; // want no change in rho
+      desiredRhoVel = 0;  
 
       if (phi <= (desiredPhi + (3 * PI / 180)) && phi >= (desiredPhi + (-3 * PI / 180))) {  // if atobot is correctly oriented towards marker within 3 deg
         // Serial.print("reached desired phi");
-        if (lastMode == 2 || go_straight_flag == true) {  // go straight
-          // count1 = 0;
-          // count2 = 0;
-          resetVelController();
-          desiredRhoVel = 0;
+        if (lastMode == 2 || go_straight_flag == true) {  // go into straight case 
+
+          resetVelController(); //void left over junk values
+          desiredRhoVel = 0; 
           lastMode = 0;
-          mode = 1;
-          desiredRho = markerDistance - .10;
+          mode = 1; // go straight
+          desiredRho = markerDistance - .10; //stop 10 cm away from marker
         }
       }
       break;
-    case 1:
-      // if (first_flag == true) { // set desired Rho to given camera distance once
-      // desiredPhi = markerAngle;
+    case 1: //Go straight using PID controller
+
       if (abs(Rho) >= abs(desiredRho)) {  //reached marker
-        // Serial.print("reached desired Rho");
         lastMode = mode;
         mode = 3;  //wait to get graded
       }
       break;
-    case 2:  //spin while waiting
+    case 2:  //scan environment while waiting for camera
 
       desiredRhoVel = 0;
       //desiredPhiVel = 7.5;
 
-      if (currentTime - stutter < 0.75 && detection_flag != true && detection_flag != true) {
+      if (currentTime - stutter < 0.75 && detection_flag != true && detection_flag != true) { //bounce between wait case and scan case to allow camera time to calculate and send
         desiredPhiVel = -7.5;
         desiredRhoVel = 0;
       } else {
-        stutter = currentTime;
+        stutter = currentTime; //keep track of wait time
         lastMode = mode;
         resetVelController();
-        // desiredPhiVel = 0;
-        // desiredRhoVel = 0;
+
         mode = 3;
       }
-      if (detection_flag == true) {
+      if (detection_flag == true) { // camera sends data
         Serial.print("Found marker");
-        // count1 = 0;
-        // count2 = 0;
-        // desiredPhiVel = 0;  //resetVelController
-        // desiredRhoVel = 0;
         resetVelController();
         lastMode = 2;
         mode = 0;
-        desiredPhi = markerAngle;
+        desiredPhi = markerAngle; //turn towards marker
 
         delay(1500);
       }
@@ -290,16 +287,16 @@ void loop() {
       break;
     case 3:  //wait
       Serial.print("waiting...");
-      desiredPhiVel = 0;
-      desiredRhoVel = 0;  //resetVelController
+      desiredPhiVel = 0; //want no motion in rho of phi
+      desiredRhoVel = 0; 
       desiredPhi = 0;
       desiredRho = 0;
-      if (lastMode == 2 && (currentTime - stutter >= 3.75)) {
+      if (lastMode == 2 && (currentTime - stutter >= 3.75)) { // go to scan case when done waiting for camera
         lastMode = 3;
         mode = 2;
-        stutter = currentTime;
+        stutter = currentTime; //
       }
-      analogWrite(MotorVoltage[0], 0);
+      analogWrite(MotorVoltage[0], 0);//catchall for do nothing case
       analogWrite(MotorVoltage[1], 0);
       break;
   }
@@ -310,27 +307,27 @@ void loop() {
     derivativePhi = (errorPhi - errorPhiInitial) / ((float)(desired_Ts_ms / 1000));  //D controller
     integralPhi = integralPhi + errorPhi * ((float)(desired_Ts_ms / 1000));          //I controller
     desiredPhiVel = errorPhi * KpPhi + KdPhi * derivativePhi + KiPhi * integralPhi;  //PID controller
-    if (abs(desiredPhiVel) > 10) {
-      desiredPhiVel = 10 * desiredPhiVel / abs(desiredPhiVel);
+    if (abs(desiredPhiVel) > 10) {                                                   //cap phi speed
+      desiredPhiVel = 10 * desiredPhiVel / abs(desiredPhiVel);                       // but keep sign
     }
 
-    errorRho = desiredRho - Rho;
+    errorRho = desiredRho - Rho;                                                      //position control
     derivativeRho = (errorRho - errorRhoInitial) / ((float)(desired_Ts_ms / 1000));
     integralRho = integralRho + errorRho * ((float)(desired_Ts_ms / 1000));
-    desiredRhoVel = errorRho * KpRho + KdRho * derivativeRho + KiRho * integralRho;
+    desiredRhoVel = errorRho * KpRho + KdRho * derivativeRho + KiRho * integralRho;   //find desired Rho vel from controller
 
-    if (abs(desiredRhoVel) > 7) {
-      desiredRhoVel = 7 * desiredRhoVel / abs(desiredRhoVel);
-    }
+    if (abs(desiredRhoVel) > 7) {                                                     //cap RhoVel
+      desiredRhoVel = 7 * desiredRhoVel / abs(desiredRhoVel);                         //but keep its sign
+    }            
   }
-  phiVel = (r / d) * (vel[0] - vel[1]);
-  rhoVel = (r / 2) * (vel[0] + vel[1]);
+  phiVel = (r / d) * (vel[0] - vel[1]);                                               // use calculated wheel velocity find velocities at center of rotation
+  rhoVel = (r / 2) * (vel[0] + vel[1]);                                               // forward vel of atobot
 
   errorRhoVel = rhoVel - desiredRhoVel;
   errorPhiVel = phiVel - desiredPhiVel;
 
 
-  Serial.print("\t mode ");
+  Serial.print("\t mode ");//debugging prints
   Serial.print(mode);
   Serial.print("\t");
   Serial.print(desiredPhi);
@@ -340,14 +337,14 @@ void loop() {
   Serial.print(desiredRho);
   Serial.print("\t");
   Serial.println(Rho);
-  // Serial.println(circle_flag);
 
-  Vbar = errorRhoVel * KpRhoVel;
-  deltaV = errorPhiVel * KpPhiVel;
-
+   //proportional voltage calculations
+  Vbar = errorRhoVel * KpRhoVel;    
+  deltaV = errorPhiVel * KpPhiVel;  
   voltage[0] = (Vbar + deltaV) / 2;
   voltage[1] = (Vbar - deltaV) / 2;
-  if (mode != 3) {
+  
+  if (mode != 3) { //wait case
     for (int i = 0; i < 2; i++) {  // for each wheel
       if (voltage[i] >= 0) {       //turn correct direction
         digitalWrite(MotorSign[i], HIGH);

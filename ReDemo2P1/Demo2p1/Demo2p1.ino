@@ -1,6 +1,6 @@
 /*
 Names: Ian McGrath and Daniel Langdon
-Code: Demo 1
+Code: Final Demo (Demo 2 Redo)
 Setup:
 Using the motor drive Polula Dual MC33926 Motor Driver shield, the Arduino Uno, and 
 a Voltage Monitor. Connect the Motor Driver onto the Arduino Uno, connect a battery to the
@@ -9,8 +9,9 @@ the motors to the two pins next to voltage pins of the motor driver and the enco
 and digital pin 5 or 6 with the blue and green wired going to Vcc and ground pins on the motor driver. The motor sign pins 
 allow voltage to flow to the motor and the Voltage pins send the voltage to allow the motor to spin. 
 Code Usage:
-This code uses a PI controller to allow the wheels to travel a certain angle and distance and stop. You set these values in the setup called
-desiredPhi and desiredDis in radians and meters respectively and if you connect the arduino and upload the code it will turn that angle and drive that distance 
+This code uses a PI controller to allow the wheels to travel a certain angle and distance and stop. The angle and distance is read from camera input, interpreted and sent by a raspberry PI.
+if you connect the arduino and upload the code it will rotate until the marker is found and then detect it and angle towards and drive the distance 
+given by the PI
 */
 
 #include <Wire.h>
@@ -236,23 +237,26 @@ void loop() {
           resetVelController();
           lastMode = 0;
           mode = 1; //////see line 252
-          if ((markerAngle <= -15*PI/180) ||(markerAngle >= 15*PI/180)){ ///set variable marker distances to account for fish-eyeing on camera lens
-            desiredRho = markerDistance - .05;
+          if ((markerAngle <= -20*PI/180) ||(markerAngle >= 20*PI/180)){ ///set variable marker distances to account for fish-eyeing on camera lens
+            desiredRho =(markerDistance+.25);
           }
-          if ((markerAngle <= -10*PI/180) ||(markerAngle >= 10*PI/180)){ ///set variable marker distances to account for fish-eyeing on camera lens
-            desiredRho = markerDistance - .085;
+          else if ((markerAngle <= -15*PI/180) ||(markerAngle >= 15*PI/180)){ ///set variable marker distances to account for fish-eyeing on camera lens
+            desiredRho = (markerDistance-0.05);
           }
-          if ((markerAngle <= -5*PI/180) ||(markerAngle >= 5*PI/180)){
-            desiredRho = markerDistance - .23;
+          else if ((markerAngle <= -10*PI/180) ||(markerAngle >= 10*PI/180)){ ///set variable marker distances to account for fish-eyeing on camera lens
+            desiredRho = (markerDistance-0.15);
+          }
+          else if ((markerAngle <= -5*PI/180) ||(markerAngle >= 5*PI/180)){
+            desiredRho = (markerDistance-.2);
             // desiredRhoVel += 5;  /////////////////////////////new            analogWrite; 
 
           }
-          if ((markerAngle <= -2*PI/180) || (markerAngle >= 2*PI/180)){
-            desiredRho = markerDistance - .3;
+          else if ((markerAngle <= -2*PI/180) || (markerAngle >= 2*PI/180)){
+            desiredRho = markerDistance - 0.05;
             // desiredRhoVel += 5;  /////////////////////////////new
           }
           else{
-            desiredRho = markerDistance - .1;
+            desiredRho = markerDistance - .2;
 
 
           }
@@ -270,7 +274,7 @@ void loop() {
 
       desiredRhoVel = 0;
       //desiredPhiVel = 7.5;
-      if ((currentTime - stutter < .77) && (detection_flag != true) ) { ////burst length
+      if ((currentTime - stutter < 1) && (detection_flag != true) ) { ////burst length .77
         if(detection_flag == false){ 
           desiredPhiVel = -8.5;
           desiredRhoVel = 0;

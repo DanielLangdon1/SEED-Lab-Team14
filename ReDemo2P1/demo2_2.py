@@ -31,6 +31,7 @@ aruco_marker_size_in_cm = 6.6
 #Initializing
 q = queue.Queue()
 q2 = queue.Queue()
+q3=queue.Queue()
 
 
 #Sending Data and using threading to be efficient
@@ -52,50 +53,10 @@ def Send():
             q.queue.clear()
 
             #distance get and clear
-            distance = q2.get()
+            distance_bit1 = q2.get()
+	    distance_bit2 = q3.get()
             q2.queue.clear()
-
-            #angle state machine
-            if angle >= -30 and angle <-22.5:#If angle is far away on left side
-                angle_bit='1'
-            elif angle >= -22.5 and angle <-15:#If angle is on left side
-                angle_bit='2'
-            elif angle >= -15 and angle <-7.5:#If angle is close on left side
-                angle_bit='3'
-            elif angle >= -7.5 and angle <-3:#If angle is very close on left side
-                angle_bit='4'
-            elif angle >= -3 and angle <=3:#If angle is spot on
-                angle_bit='5'
-            elif angle > 3 and angle <=7.5:#If angle is very close on right side
-                angle_bit='6'
-            elif angle > 7.5 and angle <=15:#If angle is close on right side
-                angle_bit='7'
-            elif angle > 15 and angle <=22.5:#If angle is on right side
-                angle_bit='8'
-            elif angle > 22.5 and angle <=30:#If angle is far on right side
-                angle_bit='9'
-
-            
-            #distance state machine
-            '''
-            Splits 8 foot range between 99 given codes
-            Arduino knows the tranlsation constant and decodes
-            back to original distance
-            '''
-            for i in range(99):
-                dmax = i * 2.5
-                dmin = (i - 1) * 2.5
-                if (distance >= dmin and distance <= dmax):
-                    if (i < 10):
-                        i = str(i)
-                        distance_bit1 = 0
-                        distance_bit2 = i[0]
-                    else:
-                        i = str(i)
-                        distance_bit1 = i[0]
-                        distance_bit2 = i[1]
-                    i = int(i)
-		    break
+	    q3.queue.clear()
             
             #print(f"Bits: {distance_bit1} + {distance_bit2}")
 
@@ -167,11 +128,54 @@ else:
                 distance = (1043 * aruco_marker_size_in_cm) / abs(corners[0][0][3][0]-corners[0][0][2][0])
                 distance=round(distance,1)
                 print(f"distance is {distance}")
+		
 
                 angle= degPerPixel *-((corners[0][0][3][0]+corners[0][0][2][0])/2 - 616)
                 #print(f"Angle is {angle}")
-                q.put(angle)
-                q2.put(distance)
+		 #angle state machine
+            if angle >= -30 and angle <-22.5:#If angle is far away on left side
+                angle_bit='1'
+            elif angle >= -22.5 and angle <-15:#If angle is on left side
+                angle_bit='2'
+            elif angle >= -15 and angle <-7.5:#If angle is close on left side
+                angle_bit='3'
+            elif angle >= -7.5 and angle <-3:#If angle is very close on left side
+                angle_bit='4'
+            elif angle >= -3 and angle <=3:#If angle is spot on
+                angle_bit='5'
+            elif angle > 3 and angle <=7.5:#If angle is very close on right side
+                angle_bit='6'
+            elif angle > 7.5 and angle <=15:#If angle is close on right side
+                angle_bit='7'
+            elif angle > 15 and angle <=22.5:#If angle is on right side
+                angle_bit='8'
+            elif angle > 22.5 and angle <=30:#If angle is far on right side
+                angle_bit='9'
+           q.put(angle_bit)
+	    
+	   #distance state machine
+            '''
+            Splits 8 foot range between 99 given codes
+            Arduino knows the tranlsation constant and decodes
+            back to original distance
+            '''
+            for i in range(99):
+                dmax = i * 2.5
+                dmin = (i - 1) * 2.5
+                if (distance >= dmin and distance <= dmax):
+                    if (i < 10):
+                        i = str(i)
+                        distance_bit1 = 0
+                        distance_bit2 = i[0]
+                    else:
+                        i = str(i)
+                        distance_bit1 = i[0]
+                        distance_bit2 = i[1]
+                    i = int(i)
+		    break
+	    
+           q2.put(distance_bit1)
+	   q3.put(distance_bit2)
 
                 #Commented out -- These lines show video feed
                 '''
@@ -184,6 +188,7 @@ else:
         #COMMENTED OUT -- These lines show video feed              
         #cv2.imshow("overlay",dst)
 
+	#NEEDED LINE
         ret, image = camera.read()
 
 

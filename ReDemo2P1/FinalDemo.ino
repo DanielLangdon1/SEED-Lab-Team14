@@ -1,6 +1,6 @@
 /*
 Names: Ian McGrath and Daniel Langdon
-Code: Demo 2 Part 2 (Drive in Circle around a beacon)
+Code: Final Demo (Demo 2 Redo(Drive in Circle around a beacon))
 Setup:
 Using the motor drive Polula Dual MC33926 Motor Driver shield, the Arduino Uno, and 
 a Voltage Monitor. Connect the Motor Driver onto the Arduino Uno, connect a battery to the
@@ -9,7 +9,7 @@ the motors to the two pins next to voltage pins of the motor driver and the enco
 and digital pin 5 or 6 with the blue and green wired going to Vcc and ground pins on the motor driver. The motor sign pins 
 allow voltage to flow to the motor and the Voltage pins send the voltage to allow the motor to spin. 
 Code Usage:
-This code uses a PID controller to allow the wheels to travel 7ft (mode 1), turn 90 degrees (mode 0), and drive in a 1ft radius circle around a beacon (mode 4). As
+This code uses a PID controller to allow the wheels to travel a distance set by the camera (mode 1), turn 90 degrees (mode 0), and drive in a 1ft radius circle around a beacon (mode 4). As
 long as you have the correct hardware setup, you simply have to upload the code and it will do this task. Mode 2 is used in another demo to rotate until a marker is found.
 The receive function are if you want to attach a PI and a camera to find the distance and angle away from an Aruco marker and use those distances to drive the robot 
 to within a foot of the marker and then go in a circle
